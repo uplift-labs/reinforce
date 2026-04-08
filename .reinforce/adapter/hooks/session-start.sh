@@ -35,7 +35,9 @@ for _old_hb in "$STATE_DIR"/*.marker.hb; do
   [ "$_old_base" = "$SESSION" ] && continue  # skip ourselves (shouldn't exist yet)
 
   # Read sidecar: "<heartbeat_pid> <parent_winpid|0> <monitored_pid|0>"
-  read -r _old_hb_pid _ _ < "$_old_hb" 2>/dev/null || continue
+  # Note: use "|| true" not "|| continue" — read returns 1 on EOF without newline
+  _old_hb_pid=""
+  read -r _old_hb_pid _ _ < "$_old_hb" 2>/dev/null || true
   [ -z "$_old_hb_pid" ] && continue
 
   # Kill old heartbeat so it doesn't trigger a duplicate reflection later
@@ -121,11 +123,17 @@ RESULT=$(printf '%s' "$INPUT" | bash "$ROOT/core/cmd/reinforce-run.sh" session-s
 
 case "$RESULT" in
   BLOCK:*)
-    printf '%s' "${RESULT#BLOCK:}" >&2
-    exit 2
+    _reason="${RESULT#BLOCK:}"
+    _escaped=$(printf '%s' "$_reason" | sed 's/\\/\\\\/g; s/"/\\"/g' | tr '\n' ' ')
+    printf '{"decision":"block","reason":"%s"}' "$_escaped"
+    exit 0
     ;;
   *)
-    [ -n "$RESULT" ] && printf '%s\n' "$RESULT"
+    if [ -n "$RESULT" ]; then
+      _escaped=$(printf '%s' "$RESULT" | sed 's/\\/\\\\/g; s/"/\\"/g' | tr '\n' ' ')
+      printf '{"decision":"block","reason":"%s"}' "$_escaped"
+      exit 0
+    fi
     ;;
 esac
 exit 0

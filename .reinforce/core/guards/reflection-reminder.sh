@@ -38,6 +38,6 @@ touch "$MARKER"
 
 REASON="[reinforce] ${PENDING_COUNT} reflections accumulated in ${REFLECTIONS_DIR}/. Recommend running /reinforce to process them."
 
-# Plain text for startup banner
-printf '%s Tell the user and recommend running /reinforce.\n' "$REASON"
+# Plain text for startup banner (shown directly via decision:block JSON in adapter)
+printf '%s\n' "$REASON"
 exit 0

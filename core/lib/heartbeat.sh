@@ -78,7 +78,7 @@ trap cleanup EXIT
 # SIGHUP arrives when the terminal closes. Treat it as parent death.
 trap '_parent_died=1' HUP
 
-printf '%s %s %s' "$$" "${PARENT_WINPID:-0}" "${PID:-0}" > "$_hb_sidecar" 2>/dev/null || exit 1
+printf '%s %s %s\n' "$$" "${PARENT_WINPID:-0}" "${PID:-0}" > "$_hb_sidecar" 2>/dev/null || exit 1
 
 _start=$(date +%s)
 _tick=0
