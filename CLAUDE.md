@@ -15,7 +15,7 @@ Reinforce is an automatic reinforcement loop for AI coding sessions. It captures
 - `WARN:<context>` — warn but allow
 - Empty — allow silently
 
-**Data flow:** Capture (session-reflection) → Accumulate (pending dir) → Remind (reflection-reminder) → Distill (`/reflection-retro` skill in plan mode) → Apply (user approves)
+**Data flow:** Capture (session-reflection) → Accumulate (reflections dir) → Remind (reflection-reminder) → Distill (`/reinforce` skill in plan mode) → Apply (user approves)
 
 ### Key directories
 
@@ -23,7 +23,7 @@ Reinforce is an automatic reinforcement loop for AI coding sessions. It captures
 - `core/cmd/reinforce-run.sh` — Multiplexer that groups guards by hook event (`stop`, `user-prompt`, `session-start`), reads stdin once, runs guards in sequence with priority (BLOCK > WARN > pass)
 - `core/lib/` — `json-field.sh` (bash JSON extraction), `json-merge.py` (idempotent Python settings merger)
 - `adapters/claude-code/hooks/` — Three adapter scripts translating Claude Code hook JSON to core guard protocol
-- `skills/reflection-retro/SKILL.md` — Agentic skill spec for batch-processing reflections
+- `skills/reinforce/SKILL.md` — Agentic skill spec for batch-processing reflections
 
 ### Design principles
 
@@ -53,7 +53,7 @@ python3 core/lib/json-merge.py --uninstall /path/to/.claude/settings.json adapte
 
 ### No build/test/lint pipeline
 
-There are no automated tests. Validation is manual — guards fire via Claude Code hooks, reflections appear in `.reinforce/reflections/pending/`.
+There are no automated tests. Validation is manual — guards fire via Claude Code hooks, reflections appear in `.reinforce/reflections/`.
 
 ## Bash conventions
 
@@ -67,7 +67,7 @@ There are no automated tests. Validation is manual — guards fire via Claude Co
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `REINFORCE_PENDING_DIR` | `.reinforce/reflections/pending` | Reflections storage |
+| `REINFORCE_REFLECTIONS_DIR` | `.reinforce/reflections` | Reflections storage |
 | `REINFORCE_MIN_TURNS` | `10` | Min assistant turns to trigger reflection |
 | `REINFORCE_MIN_TOOLS` | `10` | Min tool uses to trigger |
 | `REINFORCE_MIN_LINES` | `200` | Min transcript lines |

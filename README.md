@@ -15,11 +15,11 @@ AI-assisted development generates experience every session — lessons learned, 
 reinforce closes this loop automatically:
 
 1. **Capture** — at session end, prompts for a structured reflection (goal, outcome, what worked, mistakes, key decision, lesson)
-2. **Accumulate** — reflections collect in `.reinforce/reflections/pending/`
+2. **Accumulate** — reflections collect in `.reinforce/reflections/`
 3. **Remind** — when 3+ reflections accumulate, nudges you to run the retro
 4. **Audit** — optional LLM audit catches sycophancy, scope drift, and test quality issues
-5. **Distill** — `/reflection-retro` skill analyses patterns across sessions, proposes improvements in **plan mode** for your review
-6. **Clean up** — processed reflections are deleted from pending (git history preserves them)
+5. **Distill** — `/reinforce` skill analyses patterns across sessions, proposes improvements in **plan mode** for your review
+6. **Clean up** — processed reflections are deleted (git history preserves them)
 
 ## Install
 
@@ -53,10 +53,10 @@ your-project/
 │   ├── core/cmd/             # Multiplexer
 │   ├── core/lib/             # JSON utilities
 │   ├── adapter/hooks/        # Claude Code adapters (with --with-claude-code)
-│   └── reflections/pending/  # Where reflections accumulate
+│   └── reflections/          # Where reflections accumulate
 ├── .claude/
 │   ├── settings.json         # Hooks merged in (with --with-claude-code)
-│   └── skills/reinforce-retro/SKILL.md  # Retro skill (with --with-claude-code)
+│   └── skills/reinforce/SKILL.md  # Retro skill (with --with-claude-code)
 ```
 
 ## How it works
@@ -69,11 +69,11 @@ your-project/
 | **reflection-reminder** | SessionStart, Stop | Reminds when 3+ reflections are waiting to be processed |
 | **session-quality-audit** | Stop | Optional LLM audit of session tail for quality issues (requires `claude` CLI) |
 
-### Retro skill (`/reflection-retro`)
+### Retro skill (`/reinforce`)
 
-When enough reflections accumulate, run `/reflection-retro`. The skill:
+When enough reflections accumulate, run `/reinforce`. The skill:
 
-1. **Loads context** — reads all pending reflections, CLAUDE.md rules, and previous retro outcomes
+1. **Loads context** — reads all reflections, CLAUDE.md rules, and previous retro outcomes
 2. **Triages** — classifies valid/invalid, assigns recency tiers (recent/older/stale)
 3. **Extracts patterns** — 5 lenses: repeating mistakes, recurring action items, success patterns, reasoning patterns, stale lessons (DoT detection). Adds causal linking and confidence tags (strong/moderate/tentative)
 4. **Validates** — skeptic + minimalist adversarial check before generating improvements
@@ -93,7 +93,7 @@ All configuration via environment variables:
 | `REINFORCE_DISABLE_SESSION_REFLECTION` | — | Disable reflection capture |
 | `REINFORCE_DISABLE_REFLECTION_REMINDER` | — | Disable accumulation reminders |
 | `REINFORCE_DISABLE_SESSION_QUALITY_AUDIT` | — | Disable LLM audit (auto-skipped if `claude` CLI unavailable) |
-| `REINFORCE_PENDING_DIR` | `.reinforce/reflections/pending` | Custom reflections directory |
+| `REINFORCE_REFLECTIONS_DIR` | `.reinforce/reflections` | Custom reflections directory |
 | `REINFORCE_MIN_TURNS` | `10` | Min assistant turns to trigger reflection |
 | `REINFORCE_MIN_TOOLS` | `10` | Min tool uses to trigger reflection |
 | `REINFORCE_MIN_LINES` | `200` | Min transcript lines to trigger reflection |

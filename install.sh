@@ -6,7 +6,7 @@
 #
 # By default installs only the core guards. With --with-claude-code,
 # also installs the Claude Code adapter hooks, merges hook config
-# into .claude/settings.json, and copies the reflection-retro skill.
+# into .claude/settings.json, and copies the reinforce skill.
 
 set -u
 
@@ -32,10 +32,10 @@ done
 
 INSTALL_ROOT="$TARGET/.reinforce"
 mkdir -p "$INSTALL_ROOT/core/lib" "$INSTALL_ROOT/core/cmd" "$INSTALL_ROOT/core/guards"
-mkdir -p "$INSTALL_ROOT/reflections/pending"
+mkdir -p "$INSTALL_ROOT/reflections"
 
-# Create .gitkeep so pending dir survives empty-dir pruning
-[ ! -f "$INSTALL_ROOT/reflections/pending/.gitkeep" ] && touch "$INSTALL_ROOT/reflections/pending/.gitkeep"
+# Create .gitkeep so reflections dir survives empty-dir pruning
+[ ! -f "$INSTALL_ROOT/reflections/.gitkeep" ] && touch "$INSTALL_ROOT/reflections/.gitkeep"
 
 # sync_sh_dir <src_dir> <dest_dir> — mirror *.sh from src into dest.
 sync_sh_dir() {
@@ -71,10 +71,10 @@ if [ "$WITH_CC" -eq 1 ]; then
   sync_sh_dir "$SCRIPT_DIR/adapters/claude-code/hooks" "$ADAPTER_DIR/hooks"
   chmod +x "$ADAPTER_DIR/hooks/"*.sh
 
-  # Copy reflection-retro skill
-  SKILL_DEST="$TARGET/.claude/skills/reinforce-retro"
+  # Copy reinforce skill
+  SKILL_DEST="$TARGET/.claude/skills/reinforce"
   mkdir -p "$SKILL_DEST"
-  cp "$SCRIPT_DIR/skills/reflection-retro/SKILL.md" "$SKILL_DEST/SKILL.md"
+  cp "$SCRIPT_DIR/skills/reinforce/SKILL.md" "$SKILL_DEST/SKILL.md"
   printf '[reinforce] skill installed at %s\n' "$SKILL_DEST"
 
   # Merge hooks into settings.json
@@ -93,8 +93,8 @@ fi
 
 printf '[reinforce] done.\n'
 printf '  core installed at:  %s\n' "$INSTALL_ROOT/core"
-printf '  reflections dir:    %s\n' "$INSTALL_ROOT/reflections/pending"
+printf '  reflections dir:    %s\n' "$INSTALL_ROOT/reflections"
 [ "$WITH_CC" -eq 1 ] && printf '  claude-code adapter: %s\n' "$INSTALL_ROOT/adapter"
-[ "$WITH_CC" -eq 1 ] && printf '  retro skill:         %s\n' "$TARGET/.claude/skills/reinforce-retro"
+[ "$WITH_CC" -eq 1 ] && printf '  retro skill:         %s\n' "$TARGET/.claude/skills/reinforce"
 printf '\n  Commit .reinforce/ (and .claude/ if using Claude Code)\n'
 printf '  so that guards are available in worktrees.\n'

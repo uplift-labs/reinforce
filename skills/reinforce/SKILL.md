@@ -1,5 +1,5 @@
 ---
-name: reflection-retro
+name: reinforce
 description: Process accumulated session reflections into actionable improvements via plan mode — analyze patterns, propose changes, user reviews, then execute
 ---
 
@@ -7,11 +7,11 @@ description: Process accumulated session reflections into actionable improvement
 
 Batch-process session reflections into patterns and concrete project improvements. Works in **plan mode**: analyse first, propose a plan, user reviews, then execute approved changes.
 
-**Trigger:** User says `/reflection-retro`, or `reflection-reminder` guard signals 3+ pending reflections at session start.
+**Trigger:** User says `/reinforce`, or `reflection-reminder` guard signals 3+ reflections at session start.
 
 **Scope boundary:** This skill processes reflection files and produces improvement plans. Session reflections themselves are written by the `session-reflection.sh` guard (Stop hook).
 
-**Resource context:** Claude Max, no API budget. Input: markdown files in reflections pending directory. Output: improvement plan → user-approved changes → commit.
+**Resource context:** Claude Max, no API budget. Input: markdown files in reflections directory. Output: improvement plan → user-approved changes → commit.
 
 ## Agentic Protocol
 
@@ -25,15 +25,13 @@ Batch-process session reflections into patterns and concrete project improvement
 
 #### Step 0 — Load Context
 
-1. Locate the reflections directory. Check in order: `$REINFORCE_PENDING_DIR`, `.reinforce/reflections/pending/`, `docs/reflections/pending/`. Use the first that exists.
-2. Read all `.md` files in the pending directory. Count them.
+1. Locate the reflections directory. Check in order: `$REINFORCE_REFLECTIONS_DIR`, `.reinforce/reflections/`, `docs/reflections/`. Use the first that exists.
+2. Read all `.md` files in the reflections directory. Count them.
 3. If < 3 files, inform user that retro works best with 3+ reflections and ask whether to proceed.
 4. Read `CLAUDE.md` (current rules) — needed to avoid duplicate improvements and to count existing rules.
-5. Check `git log --oneline -10 -- <pending-dir>` for recent retro commits — avoid repeating past findings.
+5. Check `git log --oneline -10 -- <reflections-dir>` for recent retro commits — avoid repeating past findings.
 6. Load previous retro outcomes: run `git log --format=%B -1 --grep="feat(retro)"` to extract the last retro's applied improvements and their TEST criteria. If found, hold for Step 4 review.
-7. Read `.reinforce/skill-feedback.md` if it exists — incorporate meta-feedback from previous runs.
-
-**Gate:** Do not proceed unless you have read all pending reflections.
+**Gate:** Do not proceed unless you have read all reflections.
 
 #### Step 1 — Triage
 
@@ -173,7 +171,7 @@ Apply all user-approved improvements from the plan.
 
 #### Step 7 — Clean Up and Commit
 
-1. Delete all processed reflection files from the pending directory (git history preserves them).
+1. Delete all processed reflection files from the reflections directory (git history preserves them).
 2. Commit all changes with structured metadata:
 
 ```
@@ -189,32 +187,6 @@ Retired rules: [list or "none"]
 Previous retro assessed: [kept/retired/not-yet-evaluated or "first retro"]
 ```
 
-### Phase 4: Skill Feedback
-
-#### Step 8 — Capture Skill Improvement Signal
-
-**Debiasing check:** Before self-evaluation, consider — "Am I rating this retro's quality higher because I produced it? What would a critical reviewer say about the pattern extraction quality and improvement specificity?"
-
-Record an objective signal: of the N improvements proposed, how many did the user approve without modification vs rejected or heavily modified? This ratio is a bias-free quality metric.
-
-Then reflect on the retro process:
-- Did pattern extraction find real patterns or noise?
-- Were the improvements actionable or too vague?
-- Did any improvement conflict with existing rules?
-- Did the multi-perspective validation (Step 2.5) change any conclusions?
-
-If you identify a concrete improvement to this skill:
-1. Append a structured entry to `.reinforce/skill-feedback.md`:
-   ```
-   ## [date] Retro feedback
-   **Approval rate:** M/N improvements approved without modification
-   **Problem:** [what went wrong or could be better in the retro process]
-   **Suggestion:** [specific change to SKILL.md — what to add/remove/modify]
-   **Evidence:** [which reflections showed this]
-   ```
-2. Do NOT edit SKILL.md directly — the skill spec is a stable contract maintained via PRs.
-3. Inform the user: "Skill improvement suggestion saved to `.reinforce/skill-feedback.md`. Consider submitting as a PR to uplift-labs/reinforce."
-
 ## Reinforcement
 
-Full cycle: load → triage (with recency) → extract (5 lenses + causal linking + confidence) → validate (skeptic + minimalist) → generate (retire-first, TART format, anti-superstition) → plan (previous retro review, rule count check) → user review → execute → clean up with structured commit → skill feedback (debiased). Every pattern needs evidence from 2+ reflections. Top 3 + up to 2 conditional improvements. Plan mode for user review. Commit before finishing. Skill improvements go to feedback file, never to SKILL.md directly.
+Full cycle: load → triage (with recency) → extract (5 lenses + causal linking + confidence) → validate (skeptic + minimalist) → generate (retire-first, TART format, anti-superstition) → plan (previous retro review, rule count check) → user review → execute → clean up with structured commit. Every pattern needs evidence from 2+ reflections. Top 3 + up to 2 conditional improvements. Plan mode for user review. Commit before finishing. If the retro process itself needs improving, include SKILL.md changes in the plan like any other improvement.
