@@ -34,13 +34,6 @@ INSTALL_ROOT="$TARGET/.reinforce"
 mkdir -p "$INSTALL_ROOT/core/lib" "$INSTALL_ROOT/core/cmd" "$INSTALL_ROOT/core/guards"
 mkdir -p "$INSTALL_ROOT/reflections"
 
-# Ensure .gitignore excludes reflections
-GITIGNORE="$TARGET/.gitignore"
-if ! grep -qF '.reinforce/reflections/' "$GITIGNORE" 2>/dev/null; then
-  printf '\n# Reflections are generated per-session, not tracked in git\n.reinforce/reflections/\n' >> "$GITIGNORE"
-  printf '[reinforce] added .reinforce/reflections/ to .gitignore\n'
-fi
-
 # sync_sh_dir <src_dir> <dest_dir> — mirror *.sh from src into dest.
 sync_sh_dir() {
   local src="$1" dest="$2"
