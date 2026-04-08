@@ -14,12 +14,11 @@ AI-assisted development generates experience every session — lessons learned, 
 
 reinforce closes this loop automatically:
 
-1. **Capture** — at session end, prompts for a structured reflection (goal, outcome, what worked, mistakes, key decision, lesson)
+1. **Capture** — when a session ends, a background process detects it via heartbeat and generates a structured reflection using `claude -p`
 2. **Accumulate** — reflections collect in `.reinforce/reflections/`
-3. **Remind** — when 3+ reflections accumulate, nudges you to run the retro
-4. **Audit** — optional LLM audit catches sycophancy, scope drift, and test quality issues
-5. **Distill** — `/reinforce` skill analyses patterns across sessions, proposes improvements in **plan mode** for your review
-6. **Clean up** — processed reflections are deleted (git history preserves them)
+3. **Remind** — when enough reflections accumulate (default: 5), nudges you to run the retro
+4. **Distill** — `/reinforce` skill analyses patterns across sessions, proposes improvements in **plan mode** for your review
+5. **Clean up** — processed reflections are deleted (git history preserves them)
 
 ## Install
 
@@ -49,10 +48,12 @@ bash /path/to/reinforce/install.sh --with-claude-code
 ```
 your-project/
 ├── .reinforce/
-│   ├── core/guards/          # 3 guard scripts
-│   ├── core/cmd/             # Multiplexer
-│   ├── core/lib/             # JSON utilities
+│   ├── core/guards/          # Guard scripts
+│   ├── core/cmd/             # Multiplexer, background reflection
+│   ├── core/lib/             # Config loader, JSON utilities, heartbeat
+│   ├── core/templates/       # Reflection prompt and template
 │   ├── adapter/hooks/        # Claude Code adapters (with --with-claude-code)
+│   ├── config                # Settings (key=value)
 │   └── reflections/          # Where reflections accumulate
 ├── .claude/
 │   ├── settings.json         # Hooks merged in (with --with-claude-code)
@@ -61,13 +62,17 @@ your-project/
 
 ## How it works
 
+### Background reflection
+
+When a Claude Code session ends (process exit or `/clear`), a heartbeat monitor detects it and runs `claude -p` in the background to generate a structured reflection. The reflection is saved to `.reinforce/reflections/` with a timestamp filename. Sessions that are too short or trivial are automatically skipped.
+
 ### Guards
+
+Guards run inside Claude Code hooks and produce `BLOCK:<reason>` / `WARN:<context>` / empty output.
 
 | Guard | Hook Event | What it does |
 |-------|-----------|--------------|
-| **session-reflection** | Stop, UserPromptSubmit | Prompts for structured reflection at session end; mid-session checkpoints on long sessions |
-| **reflection-reminder** | SessionStart, Stop | Reminds when 3+ reflections are waiting to be processed |
-| **session-quality-audit** | Stop | Optional LLM audit of session tail for quality issues (requires `claude` CLI) |
+| **reflection-reminder** | SessionStart | Reminds when pending reflections reach the threshold (default: 5) |
 
 ### Retro skill (`/reinforce`)
 
@@ -85,19 +90,16 @@ When enough reflections accumulate, run `/reinforce`. The skill:
 
 ## Configuration
 
-All configuration via environment variables:
+Settings are read from `.reinforce/config` (key=value), with environment variables taking priority. See `core/config.defaults` for the template.
 
-| Variable | Default | Purpose |
+| Variable / Config key | Default | Purpose |
 |----------|---------|---------|
-| `REINFORCE_DISABLED` | — | Set to `1` to disable all guards |
-| `REINFORCE_DISABLE_SESSION_REFLECTION` | — | Disable reflection capture |
-| `REINFORCE_DISABLE_REFLECTION_REMINDER` | — | Disable accumulation reminders |
-| `REINFORCE_DISABLE_SESSION_QUALITY_AUDIT` | — | Disable LLM audit (auto-skipped if `claude` CLI unavailable) |
-| `REINFORCE_REFLECTIONS_DIR` | `.reinforce/reflections` | Custom reflections directory |
-| `REINFORCE_MIN_TURNS` | `10` | Min assistant turns to trigger reflection |
-| `REINFORCE_MIN_TOOLS` | `10` | Min tool uses to trigger reflection |
-| `REINFORCE_MIN_LINES` | `200` | Min transcript lines to trigger reflection |
-| `REINFORCE_REMINDER_THRESHOLD` | `3` | Pending count before reminder fires |
+| `REINFORCE_DISABLED` / `disabled` | `false` | Global kill switch (`true`, `1`, or `yes` to disable) |
+| `REINFORCE_REMINDER_THRESHOLD` / `reminder_threshold` | `5` | Pending reflections count before reminder fires |
+| `REINFORCE_REFLECT_MODEL` / `reflect_model` | `opus` | Model for background `claude -p` reflection call |
+| `REINFORCE_DISABLE_REFLECTION_REMINDER` | — | Set to `1` to disable the reminder guard |
+
+Also auto-disabled in CI environments (`CI`, `GITHUB_ACTIONS`, `GITLAB_CI`).
 
 ## Reflection template
 
