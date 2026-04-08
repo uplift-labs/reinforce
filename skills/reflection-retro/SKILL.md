@@ -127,17 +127,26 @@ Apply all user-approved improvements from the plan.
 2. Commit all changes with: `feat(retro): process N reflections, apply M improvements`
 3. Include in the commit body: patterns found and improvements applied.
 
-### Phase 4: Self-Reflect
+### Phase 4: Skill Feedback
 
-#### Step 8 — Skill Self-Improvement
+#### Step 8 — Capture Skill Improvement Signal
 
 Reflect on the retro process:
-- Did pattern extraction find real patterns or noise? Adjust thresholds if needed.
-- Were the improvements actionable? If too vague, the Trigger-Action-Rationale template may need sharpening.
-- Did any improvement conflict with existing rules? Consider adding a dedup check.
+- Did pattern extraction find real patterns or noise?
+- Were the improvements actionable or too vague?
+- Did any improvement conflict with existing rules?
 
-**Action:** Small tweaks to this skill — apply directly via a follow-up edit. Structural changes — propose first.
+If you identify a concrete improvement to this skill:
+1. Append a structured entry to `.reinforce/skill-feedback.md`:
+   ```
+   ## [date] Retro feedback
+   **Problem:** [what went wrong or could be better in the retro process]
+   **Suggestion:** [specific change to SKILL.md — what to add/remove/modify]
+   **Evidence:** [which reflections showed this]
+   ```
+2. Do NOT edit SKILL.md directly — the skill spec is a stable contract maintained via PRs.
+3. Inform the user: "Skill improvement suggestion saved to `.reinforce/skill-feedback.md`. Consider submitting as a PR to uplift-labs/reinforce."
 
 ## Reinforcement
 
-Full cycle: load → triage → extract → plan → user review → execute → clean up. Every pattern needs evidence from 2+ reflections. Top 5 improvements max. Plan mode for user review. Commit before finishing.
+Full cycle: load → triage → extract → plan → user review → execute → clean up. Every pattern needs evidence from 2+ reflections. Top 5 improvements max. Plan mode for user review. Commit before finishing. Skill improvements go to feedback file, never to SKILL.md directly.

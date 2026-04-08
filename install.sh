@@ -60,6 +60,10 @@ sync_sh_dir "$SCRIPT_DIR/core/guards" "$INSTALL_ROOT/core/guards"
 cp "$SCRIPT_DIR/core/lib/json-merge.py" "$INSTALL_ROOT/core/lib/json-merge.py"
 chmod +x "$INSTALL_ROOT/core/cmd/"*.sh "$INSTALL_ROOT/core/guards/"*.sh
 
+# Copy templates
+mkdir -p "$INSTALL_ROOT/core/templates"
+cp "$SCRIPT_DIR/core/templates/"*.md "$INSTALL_ROOT/core/templates/" 2>/dev/null || true
+
 if [ "$WITH_CC" -eq 1 ]; then
   ADAPTER_DIR="$INSTALL_ROOT/adapter"
   mkdir -p "$ADAPTER_DIR/hooks"

@@ -102,11 +102,43 @@ DATESTAMP=$(date '+%Y-%m-%d-%H%M' 2>/dev/null || echo "undated")
 # Build optional error section
 ERROR_SECTION=""
 if [ "$BASH_ERROR_COUNT" -gt 0 ] 2>/dev/null; then
-  ERROR_LIST=$(printf '%s' "$ERROR_SUMMARY" | tr '\n' '|' | sed 's/|$//; s/|/ | /g')
-  ERROR_SECTION=" | ## Bash errors observed (${BASH_ERROR_COUNT} total) | ${ERROR_LIST}"
+  ERROR_LIST=$(printf '%s\n' "$ERROR_SUMMARY" | sed 's/^ */- /')
+  ERROR_SECTION="## Bash errors observed (${BASH_ERROR_COUNT} total)
+${ERROR_LIST}"
 fi
 
-REASON="[session-reflection] Session: ${ASSISTANT_TURNS} turns, ${TOOL_USES} tool uses, ${TRANSCRIPT_LINES} transcript lines. Before stopping: write a reflection report to ${PENDING_DIR}/${DATESTAMP}.md using this template: # Session Reflection | **Date:** ${DATESTAMP} | **Turns:** ${ASSISTANT_TURNS} | **Tool uses:** ${TOOL_USES} |${ERROR_SECTION} ## What was asked — (one sentence: the user's actual goal) | ## What was done — (bullet list of concrete actions and decisions) | ## What was left undone — (incomplete/deferred items and why) | ## Mistakes and corrections — (wrong approaches tried, errors hit, what fixed them) | ## Lesson learned — (one reusable heuristic, single sentence) | ## Action items — (1-2 concrete improvements for next time) | Then stop."
+# Read template from file, fall back to inline
+TEMPLATE_DIR="$(dirname "$0")/../templates"
+TEMPLATE=$(cat "$TEMPLATE_DIR/reflection.md" 2>/dev/null || echo "")
+
+if [ -n "$TEMPLATE" ]; then
+  FILLED=$(printf '%s' "$TEMPLATE" \
+    | sed "s/{{DATESTAMP}}/$DATESTAMP/g" \
+    | sed "s/{{ASSISTANT_TURNS}}/$ASSISTANT_TURNS/g" \
+    | sed "s/{{TOOL_USES}}/$TOOL_USES/g")
+  if [ -n "$ERROR_SECTION" ]; then
+    FILLED=$(printf '%s' "$FILLED" | sed "s|{{ERROR_SECTION}}|$ERROR_SECTION|")
+  else
+    FILLED=$(printf '%s' "$FILLED" | sed '/{{ERROR_SECTION}}/d')
+  fi
+else
+  # Fallback inline template
+  FILLED="# Session Reflection
+**Date:** ${DATESTAMP}
+**Turns:** ${ASSISTANT_TURNS}
+**Tool uses:** ${TOOL_USES}
+${ERROR_SECTION}
+## What was asked
+## What was done
+## What was left undone
+## Mistakes and corrections
+## Lesson learned
+## Action items"
+fi
+
+REASON="[session-reflection] Session: ${ASSISTANT_TURNS} turns, ${TOOL_USES} tool uses, ${TRANSCRIPT_LINES} transcript lines. Before stopping: write a reflection report to ${PENDING_DIR}/${DATESTAMP}.md using this template:
+${FILLED}
+Then stop."
 
 printf 'BLOCK:%s' "$REASON"
 exit 0

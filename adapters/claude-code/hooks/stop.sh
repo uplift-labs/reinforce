@@ -10,22 +10,16 @@ INPUT=$(cat)
 export HOOK_EVENT="stop"
 RESULT=$(printf '%s' "$INPUT" | bash "$ROOT/core/cmd/reinforce-run.sh" stop 2>/dev/null) || true
 
-# Pure-bash JSON escape
-_rf_escape() {
-  local s="$1"
-  s=${s//\\/\\\\}
-  s=${s//\"/\\\"}
-  s=${s//$'\n'/ }
-  printf '%s' "$s"
-}
+# Shared JSON escape
+. "$ROOT/core/lib/escape.sh"
 
 case "$RESULT" in
   BLOCK:*)
-    reason=$(_rf_escape "${RESULT#BLOCK:}")
+    reason=$(rf_escape "${RESULT#BLOCK:}")
     printf '{"decision":"block","reason":"%s"}' "$reason"
     ;;
   WARN:*)
-    ctx=$(_rf_escape "${RESULT#WARN:}")
+    ctx=$(rf_escape "${RESULT#WARN:}")
     printf '{"hookSpecificOutput":{"hookEventName":"Stop","additionalContext":"%s"}}' "$ctx"
     ;;
 esac
