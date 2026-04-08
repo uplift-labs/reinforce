@@ -25,6 +25,36 @@ SESSION=$(json_field "session_id" "$INPUT")
 STATE_DIR="/tmp/reinforce-sessions"
 mkdir -p "$STATE_DIR" 2>/dev/null
 
+# --- Retire previous heartbeat (handles /clear) ---
+# Find any existing .marker.hb sidecars that belong to OTHER sessions.
+# Kill the old heartbeat and trigger reflection for that session.
+for _old_hb in "$STATE_DIR"/*.marker.hb; do
+  [ -f "$_old_hb" ] || continue
+  # Extract session id from filename: <session>.marker.hb
+  _old_base="$(basename "$_old_hb" .marker.hb)"
+  [ "$_old_base" = "$SESSION" ] && continue  # skip ourselves (shouldn't exist yet)
+
+  # Read sidecar: "<heartbeat_pid> <parent_winpid|0> <monitored_pid|0>"
+  read -r _old_hb_pid _ _ < "$_old_hb" 2>/dev/null || continue
+  [ -z "$_old_hb_pid" ] && continue
+
+  # Kill old heartbeat so it doesn't trigger a duplicate reflection later
+  kill "$_old_hb_pid" 2>/dev/null || true
+
+  # Trigger reflection for the old session (background, non-blocking)
+  _old_reflect_log="$STATE_DIR/heartbeat-${_old_base}.log"
+  printf '[%s] session-start: retiring heartbeat for %s (pid=%s), triggering reflect\n' \
+    "$(date '+%H:%M:%S' 2>/dev/null)" "$_old_base" "$_old_hb_pid" \
+    >> "$_old_reflect_log" 2>/dev/null
+  bash "$ROOT/core/cmd/session-reflect.sh" \
+    --session-id "$_old_base" \
+    --reinforce-root "$ROOT" \
+    </dev/null >> "$_old_reflect_log" 2>&1 &
+
+  # Cleanup old sidecar and marker
+  rm -f "$_old_hb" "$STATE_DIR/${_old_base}.marker" 2>/dev/null
+done
+
 # --- Spawn heartbeat for current session ---
 MARKER="$STATE_DIR/${SESSION}.marker"
 touch "$MARKER" 2>/dev/null
