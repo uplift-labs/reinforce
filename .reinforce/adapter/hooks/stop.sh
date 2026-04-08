@@ -1,26 +1,19 @@
 #!/bin/bash
 # stop.sh — Claude Code Stop adapter for Reinforce.
-# Translates reinforce-run.sh output to Claude Code Stop JSON.
+# Touches heartbeat marker to keep it fresh. No blocking, no guards.
 set -u
 
 HOOK_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$HOOK_DIR/../.." && pwd)"
 
+. "$ROOT/core/lib/json-field.sh"
+
 INPUT=$(cat)
-export HOOK_EVENT="stop"
-RESULT=$(printf '%s' "$INPUT" | bash "$ROOT/core/cmd/reinforce-run.sh" stop 2>/dev/null) || true
+SESSION=$(json_field "session_id" "$INPUT")
+[ -z "$SESSION" ] && exit 0
 
-# Shared JSON escape
-. "$ROOT/core/lib/escape.sh"
+STATE_DIR="/tmp/reinforce-sessions"
+MARKER="$STATE_DIR/${SESSION}.marker"
+[ -f "$MARKER" ] && touch "$MARKER" 2>/dev/null
 
-case "$RESULT" in
-  BLOCK:*)
-    reason=$(rf_escape "${RESULT#BLOCK:}")
-    printf '{"decision":"block","reason":"%s"}' "$reason"
-    ;;
-  WARN:*)
-    ctx=$(rf_escape "${RESULT#WARN:}")
-    printf '{"hookSpecificOutput":{"hookEventName":"Stop","additionalContext":"%s"}}' "$ctx"
-    ;;
-esac
 exit 0

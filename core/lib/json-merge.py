@@ -60,7 +60,11 @@ def merge_event(existing_entries, new_entries):
 
 
 def merge_hooks(target, source):
-    """Merge source hooks into target settings."""
+    """Merge source hooks into target settings.
+
+    Also removes reinforce hooks from events not present in source
+    (e.g. UserPromptSubmit was removed from the hook config).
+    """
     if "hooks" not in source:
         return target
 
@@ -75,6 +79,20 @@ def merge_hooks(target, source):
             target["hooks"][event] = merge_event(
                 target["hooks"][event], entries
             )
+
+    # Remove reinforce hooks from events no longer in source
+    for event in list(target["hooks"]):
+        if event in source["hooks"]:
+            continue
+        groups = target["hooks"][event]
+        for group in groups:
+            group["hooks"] = [
+                h for h in group.get("hooks", [])
+                if not is_reinforce_hook(h)
+            ]
+        target["hooks"][event] = [g for g in groups if g.get("hooks")]
+        if not target["hooks"][event]:
+            del target["hooks"][event]
 
     return target
 

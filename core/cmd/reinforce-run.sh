@@ -14,13 +14,16 @@ set -u
 GROUP="${1:-}"
 [ -z "$GROUP" ] && { printf 'usage: reinforce-run.sh <group>\n' >&2; exit 0; }
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+# Load config: .reinforce/config → env vars → defaults
+. "$SCRIPT_DIR/../lib/load-config.sh"
+
 # Global kill switches
 [ "${CI:-}" = "true" ] && exit 0
 [ "${GITHUB_ACTIONS:-}" = "true" ] && exit 0
 [ "${GITLAB_CI:-}" = "true" ] && exit 0
-[ "${REINFORCE_DISABLED:-}" = "1" ] && exit 0
-
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+[ "${REINFORCE_DISABLED}" = "1" ] && exit 0
 GUARD_DIR="$SCRIPT_DIR/../guards"
 
 # Export hook event for guards that need it
@@ -28,9 +31,9 @@ export HOOK_EVENT="$GROUP"
 
 # Map group to guard list
 case "$GROUP" in
-  stop)          GUARDS="session-reflection reflection-reminder session-quality-audit" ;;
-  user-prompt)   GUARDS="session-reflection" ;;
   session-start) GUARDS="reflection-reminder" ;;
+  stop)          GUARDS="" ;;
+  user-prompt)   GUARDS="" ;;
   *) exit 0 ;;
 esac
 

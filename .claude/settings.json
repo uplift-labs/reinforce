@@ -7,20 +7,7 @@
           {
             "type": "command",
             "command": "bash \"$CLAUDE_PROJECT_DIR/.reinforce/adapter/hooks/stop.sh\"",
-            "timeout": 30000,
-            "statusMessage": "[reinforce] Session reflection check..."
-          }
-        ]
-      }
-    ],
-    "UserPromptSubmit": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash \"$CLAUDE_PROJECT_DIR/.reinforce/adapter/hooks/user-prompt.sh\"",
-            "timeout": 10000
+            "timeout": 5000
           }
         ]
       }
@@ -32,7 +19,7 @@
           {
             "type": "command",
             "command": "bash \"$CLAUDE_PROJECT_DIR/.reinforce/adapter/hooks/session-start.sh\"",
-            "timeout": 10000,
+            "timeout": 15000,
             "statusMessage": "[reinforce] Checking reflections..."
           }
         ]

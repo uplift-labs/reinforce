@@ -1,0 +1,12 @@
+# Reinforce configuration
+# Environment variables override these values.
+# Lines starting with # are comments. Blank lines are ignored.
+
+# Global kill switch (true/false)
+disabled=false
+
+# Number of reflections before reminder fires
+reminder_threshold=5
+
+# Model for background reflection (opus, sonnet, haiku)
+reflect_model=opus
