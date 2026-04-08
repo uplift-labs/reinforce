@@ -6,20 +6,26 @@
 
 {{ERROR_SECTION}}
 
-## What was asked
-(one sentence: the user's actual goal)
+## Goal
+(one sentence: what the user needed accomplished, in their terms not yours)
 
-## What was done
-(bullet list of concrete actions and decisions)
+## Outcome
+(start with exactly one tag: ACCOMPLISHED | PARTIAL | FAILED — then 1-2 sentences on what was delivered vs requested)
 
-## What was left undone
-(incomplete/deferred items and why)
+## What worked
+(approaches, tools, or strategies that proved effective — name specific files, commands, or techniques; if nothing notable, write "Routine session, no standout wins")
 
 ## Mistakes and corrections
-(wrong approaches tried, errors hit, what fixed them)
+(for each mistake: what you tried → why it failed → what signal told you to change → what fixed it; if no mistakes, write "None")
+
+## What was left undone
+(incomplete items with reason: blocked by X, deferred because Y, ran out of context; if nothing, write "All goals met")
+
+## Key decision
+(the most consequential choice this session: what alternatives existed, why you chose this path, what you'd choose differently with hindsight)
 
 ## Lesson learned
-(one reusable heuristic, single sentence)
+(format: WHEN [specific trigger] → DO [specific action] BECAUSE [evidence from this session]; not generic advice)
 
 ## Action items
-(1-2 concrete improvements for next time)
+(1-2 concrete changes; each must name a specific file, tool, command, or practice — "be more careful" is not an action item)

@@ -14,11 +14,12 @@ AI-assisted development generates experience every session — lessons learned, 
 
 reinforce closes this loop automatically:
 
-1. **Capture** — at session end, prompts for a structured reflection (what was asked, done, mistakes, lessons)
+1. **Capture** — at session end, prompts for a structured reflection (goal, outcome, what worked, mistakes, key decision, lesson)
 2. **Accumulate** — reflections collect in `.reinforce/reflections/pending/`
 3. **Remind** — when 3+ reflections accumulate, nudges you to run the retro
 4. **Audit** — optional LLM audit catches sycophancy, scope drift, and test quality issues
 5. **Distill** — `/reflection-retro` skill analyses patterns across sessions, proposes improvements in **plan mode** for your review
+6. **Clean up** — processed reflections are deleted from pending (git history preserves them)
 
 ## Install
 
@@ -72,11 +73,15 @@ your-project/
 
 When enough reflections accumulate, run `/reflection-retro`. The skill:
 
-1. **Analyses** all pending reflections (read-only)
-2. **Extracts patterns** — repeating mistakes, recurring action items, success patterns
-3. **Enters plan mode** — proposes concrete improvements to any project files
-4. **You review** — approve, adjust, or reject the plan
-5. **Executes** approved changes and commits
+1. **Loads context** — reads all pending reflections, CLAUDE.md rules, and previous retro outcomes
+2. **Triages** — classifies valid/invalid, assigns recency tiers (recent/older/stale)
+3. **Extracts patterns** — 5 lenses: repeating mistakes, recurring action items, success patterns, reasoning patterns, stale lessons (DoT detection). Adds causal linking and confidence tags (strong/moderate/tentative)
+4. **Validates** — skeptic + minimalist adversarial check before generating improvements
+5. **Generates improvements** — retire-first approach, Trigger-Action-Rationale-Test format, anti-superstition check. Top 3 + up to 2 conditional
+6. **Enters plan mode** — proposes improvements with priority ordering and CLAUDE.md rule count check
+7. **You review** — approve, adjust, or reject the plan
+8. **Executes** approved changes, deletes processed reflections, commits with structured metadata
+9. **Skill feedback** — debiased self-evaluation with objective approval rate metric
 
 ## Configuration
 
@@ -105,12 +110,29 @@ Each reflection follows this structure:
 **Turns:** 45
 **Tool uses:** 23
 
-## What was asked
-## What was done
-## What was left undone
+## Goal
+(one sentence: what the user needed accomplished, in their terms not yours)
+
+## Outcome
+(ACCOMPLISHED | PARTIAL | FAILED — what was delivered vs requested)
+
+## What worked
+(effective approaches, tools, strategies — specific files, commands, techniques)
+
 ## Mistakes and corrections
+(what you tried → why it failed → what signal told you to change → what fixed it)
+
+## What was left undone
+(incomplete items with reason: blocked by X, deferred because Y)
+
+## Key decision
+(most consequential choice: alternatives, reasoning, hindsight)
+
 ## Lesson learned
+(WHEN [trigger] → DO [action] BECAUSE [evidence from this session])
+
 ## Action items
+(1-2 concrete changes naming specific file, tool, command, or practice)
 ```
 
 ## Coexistence
