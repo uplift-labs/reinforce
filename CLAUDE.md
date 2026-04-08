@@ -15,6 +15,8 @@ Reinforce is an automatic reinforcement loop for AI coding sessions. It captures
 - `WARN:<context>` — warn but allow
 - Empty — allow silently
 
+**Adapter-level (Claude Code):** For SessionStart hooks, guards wrap messages as `{"decision":"block","reason":"<message>"}` JSON to stdout (exit 0) — this renders the message directly in Claude Code UI.
+
 **Data flow:** Heartbeat detects session end → `claude -p` generates reflection (background) → Accumulate (reflections dir) → Remind (reflection-reminder) → Distill (`/reinforce` skill in plan mode) → Apply (user approves)
 
 ### Key directories
@@ -78,3 +80,13 @@ Settings are read from `.reinforce/config` (key=value format). Environment varia
 | `reflect_model` / `REINFORCE_REFLECT_MODEL` | `opus` | Model for background reflection `claude -p` call |
 
 Per-guard disable via env: `REINFORCE_DISABLE_<GUARD_NAME>=1` (e.g. `REINFORCE_DISABLE_REFLECTION_REMINDER=1`).
+
+## Development workflow
+
+After editing files under `core/`, `adapters/`, or `skills/`, re-run the installer to update the installed copy before testing:
+
+```bash
+bash install.sh --target . --with-claude-code
+```
+
+The `.reinforce/` directory contains copies of source files — edits to repo sources do NOT auto-propagate to the installed copy.

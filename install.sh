@@ -68,6 +68,12 @@ chmod +x "$INSTALL_ROOT/core/cmd/"*.sh "$INSTALL_ROOT/core/guards/"*.sh
 mkdir -p "$INSTALL_ROOT/core/templates"
 cp "$SCRIPT_DIR/core/templates/"*.md "$INSTALL_ROOT/core/templates/" 2>/dev/null || true
 
+# Copy default config (don't overwrite existing user config)
+if [ ! -f "$INSTALL_ROOT/config" ]; then
+  cp "$SCRIPT_DIR/core/config.defaults" "$INSTALL_ROOT/config"
+  printf '[reinforce] created default config at %s/config\n' "$INSTALL_ROOT"
+fi
+
 if [ "$WITH_CC" -eq 1 ]; then
   ADAPTER_DIR="$INSTALL_ROOT/adapter"
   mkdir -p "$ADAPTER_DIR/hooks"
