@@ -101,13 +101,15 @@ def uninstall_hooks(target):
 
 
 def main():
-    if len(sys.argv) < 3:
-        print(f"Usage: {sys.argv[0]} <target.json> <source.json> [--uninstall]")
+    args = [a for a in sys.argv[1:] if not a.startswith("--")]
+    do_uninstall = "--uninstall" in sys.argv
+
+    if len(args) < 2:
+        print(f"Usage: {sys.argv[0]} [--uninstall] <target.json> <source.json>")
         sys.exit(1)
 
-    target_path = Path(sys.argv[1])
-    source_path = Path(sys.argv[2])
-    do_uninstall = "--uninstall" in sys.argv
+    target_path = Path(args[0])
+    source_path = Path(args[1])
 
     if target_path.exists():
         target = json.loads(target_path.read_text(encoding="utf-8"))

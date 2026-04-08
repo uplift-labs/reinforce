@@ -62,8 +62,8 @@ TRANSCRIPT_LINES=$(wc -l < "$TRANSCRIPT" 2>/dev/null | tr -d ' \r\n')
 [ -z "$TRANSCRIPT_LINES" ] && TRANSCRIPT_LINES=0
 
 # --- Phase 1b: Extract Bash errors from transcript ---
-RAW_ERRORS=$(grep -oE '"content":"Exit code [1-9][0-9]*\n[^"]{0,120}' "$TRANSCRIPT" 2>/dev/null \
-  | sed 's/"content":"//; s/\n/: /' )
+RAW_ERRORS=$(grep -oE '"content":"Exit code [1-9][0-9]*\\n[^"]{0,120}' "$TRANSCRIPT" 2>/dev/null \
+  | sed 's/"content":"//; s/\\n/: /' )
 BASH_ERROR_COUNT=0
 ERROR_SUMMARY=""
 if [ -n "$RAW_ERRORS" ]; then
@@ -89,7 +89,7 @@ fi
 
 if [ "$SUBSTANTIVE" = false ]; then
   # Short session — nudge only
-  printf 'WARN:[session-reflection] Short session ending (%s turns, %s tool uses). Any lesson learned worth capturing? If yes, write to %s/. If not, just stop.' "$ASSISTANT_TURNS" "$TOOL_USES" "$PENDING_DIR" >&2
+  printf 'WARN:[session-reflection] Short session ending (%s turns, %s tool uses). Any lesson learned worth capturing? If yes, write to %s/. If not, just stop.' "$ASSISTANT_TURNS" "$TOOL_USES" "$PENDING_DIR"
   exit 0
 fi
 
@@ -117,7 +117,7 @@ if [ -n "$TEMPLATE" ]; then
     | sed "s/{{ASSISTANT_TURNS}}/$ASSISTANT_TURNS/g" \
     | sed "s/{{TOOL_USES}}/$TOOL_USES/g")
   if [ -n "$ERROR_SECTION" ]; then
-    FILLED=$(printf '%s' "$FILLED" | sed "s|{{ERROR_SECTION}}|$ERROR_SECTION|")
+    FILLED=$(printf '%s' "$FILLED" | awk -v replacement="$ERROR_SECTION" '{gsub(/\{\{ERROR_SECTION\}\}/, replacement); print}')
   else
     FILLED=$(printf '%s' "$FILLED" | sed '/{{ERROR_SECTION}}/d')
   fi
@@ -128,10 +128,12 @@ else
 **Turns:** ${ASSISTANT_TURNS}
 **Tool uses:** ${TOOL_USES}
 ${ERROR_SECTION}
-## What was asked
-## What was done
-## What was left undone
+## Goal
+## Outcome
+## What worked
 ## Mistakes and corrections
+## What was left undone
+## Key decision
 ## Lesson learned
 ## Action items"
 fi

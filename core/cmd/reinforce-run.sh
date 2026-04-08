@@ -37,8 +37,9 @@ esac
 # Read stdin once
 INPUT=$(cat)
 
-# Priority tracking: BLOCK > WARN > pass
+# Priority tracking: BLOCK > WARN > plain text > pass
 BEST_WARN=""
+BEST_OTHER=""
 
 for guard in $GUARDS; do
   # Per-guard disable: REINFORCE_DISABLE_SESSION_REFLECTION=1, etc.
@@ -60,12 +61,18 @@ for guard in $GUARDS; do
         BEST_WARN="$BEST_WARN | ${RESULT#WARN:}"
       fi
       ;;
+    ?*)
+      # Plain text output (e.g. session-start banner)
+      [ -z "$BEST_OTHER" ] && BEST_OTHER="$RESULT"
+      ;;
   esac
 done
 
 # Output highest-priority non-block result
 if [ -n "$BEST_WARN" ]; then
   printf '%s' "$BEST_WARN"
+elif [ -n "$BEST_OTHER" ]; then
+  printf '%s' "$BEST_OTHER"
 fi
 
 exit 0

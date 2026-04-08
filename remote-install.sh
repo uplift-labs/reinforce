@@ -12,13 +12,13 @@ set -eu
 VERSION="${REINFORCE_VERSION:-main}"
 REPO="https://github.com/uplift-labs/reinforce.git"
 
-TMPDIR=$(mktemp -d)
-trap 'rm -rf "$TMPDIR"' EXIT
+RF_TMPDIR=$(mktemp -d)
+trap 'rm -rf "$RF_TMPDIR"' EXIT
 
 printf '[reinforce] cloning %s@%s...\n' "$REPO" "$VERSION"
-git clone --depth 1 --branch "$VERSION" "$REPO" "$TMPDIR/reinforce" 2>/dev/null || {
+git clone --depth 1 --branch "$VERSION" "$REPO" "$RF_TMPDIR/reinforce" 2>/dev/null || {
   printf '[reinforce] ERROR: failed to clone %s@%s\n' "$REPO" "$VERSION" >&2
   exit 1
 }
 
-bash "$TMPDIR/reinforce/install.sh" "$@"
+bash "$RF_TMPDIR/reinforce/install.sh" "$@"
