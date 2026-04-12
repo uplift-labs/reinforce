@@ -171,8 +171,10 @@ Apply all user-approved improvements from the plan.
 
 #### Step 7 — Clean Up and Commit
 
-1. Delete all processed reflection files from the reflections directory (git history preserves them).
-2. Commit all changes with structured metadata:
+1. Delete all processed reflection files from the reflections directory using `rm` (git history preserves them).
+2. **Verification gate** — run `ls <reflections-dir>/*.md 2>/dev/null | wc -l` and confirm the count is 0 (or only contains files created after this retro started). If files remain, delete them now — do NOT proceed to commit until the directory is clean. This step has been skipped by agents in the past, resulting in reflections accumulating across retros.
+3. Stage the deletions with `git add <reflections-dir>/`.
+4. Commit all changes (improvements + deletions) with structured metadata:
 
 ```
 feat(retro): process N reflections, apply M improvements
@@ -189,4 +191,4 @@ Previous retro assessed: [kept/retired/not-yet-evaluated or "first retro"]
 
 ## Reinforcement
 
-Full cycle: load → triage (with recency) → extract (5 lenses + causal linking + confidence) → validate (skeptic + minimalist) → generate (retire-first, TART format, anti-superstition) → plan (previous retro review, rule count check) → user review → execute → clean up with structured commit. Every pattern needs evidence from 2+ reflections. Top 3 + up to 2 conditional improvements. Plan mode for user review. Commit before finishing. If the retro process itself needs improving, include SKILL.md changes in the plan like any other improvement.
+Full cycle: load → triage (with recency) → extract (5 lenses + causal linking + confidence) → validate (skeptic + minimalist) → generate (retire-first, TART format, anti-superstition) → plan (previous retro review, rule count check) → user review → execute → **delete reflection files and verify deletion** → commit with structured metadata. Every pattern needs evidence from 2+ reflections. Top 3 + up to 2 conditional improvements. Plan mode for user review. **Never commit until reflections directory is verified clean** — this step has been silently skipped before. If the retro process itself needs improving, include SKILL.md changes in the plan like any other improvement.
