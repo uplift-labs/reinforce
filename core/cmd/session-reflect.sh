@@ -37,8 +37,9 @@ fi
 [ "${CI:-}" = "true" ] && exit 0
 [ -n "${GITHUB_ACTIONS:-}" ] && exit 0
 
-# --- Paths ---
-REFLECTIONS_DIR=".reinforce/reflections"
+# --- Paths (absolute — must not depend on CWD, which may be a worktree) ---
+REPO_ROOT="$(dirname "$REINFORCE_ROOT")"
+REFLECTIONS_DIR="$REPO_ROOT/.reinforce/reflections"
 STATE_DIR="/tmp/reinforce-sessions"
 mkdir -p "$STATE_DIR" 2>/dev/null || exit 0
 
@@ -81,32 +82,17 @@ _log "session-reflect started for $SESSION_ID"
 _log "cwd(initial): $(pwd 2>/dev/null || echo '<unresolvable>')"
 _log "REINFORCE_ROOT: $REINFORCE_ROOT"
 
-# --- Cwd recovery ---
+# --- Cwd: always use main repo root ---
 # Heartbeat inherits cwd from its launcher (often a sandbox worktree).
-# By the time this runs, sandbox-lifecycle.sh may have reaped that worktree,
-# leaving us in a directory that no longer exists. `claude --resume` resolves
-# conversation history relative to the current working directory, so a dead
-# cwd manifests as "No conversation found with session ID".
-#
-# Recovery strategy: fall back to the main repo root (parent of REINFORCE_ROOT).
-# REINFORCE_ROOT points at the installed .reinforce/ directory, so its parent
-# is always the main repo and always exists.
-_cwd_valid=1
-if ! pwd -P >/dev/null 2>&1; then
-  _cwd_valid=0
-elif ! git rev-parse --show-toplevel >/dev/null 2>&1; then
-  _cwd_valid=0
-fi
-
-if [ "$_cwd_valid" = 0 ]; then
-  _fallback_cwd="$(dirname "$REINFORCE_ROOT")"
-  if [ -d "$_fallback_cwd" ] && cd "$_fallback_cwd" 2>/dev/null; then
-    _log "cwd-recovered: dead cwd → $_fallback_cwd"
-  else
-    _log "cwd-recovery-failed: fallback $_fallback_cwd missing or cd failed — aborting"
-    printf 'failed' > "$DEDUP_FILE" 2>/dev/null
-    exit 0
-  fi
+# Even if the worktree CWD is valid, `claude --resume` should run from
+# the main repo root so conversation lookup works correctly.
+# REPO_ROOT is already set above from REINFORCE_ROOT.
+if [ -d "$REPO_ROOT" ] && cd "$REPO_ROOT" 2>/dev/null; then
+  _log "cwd-set: $REPO_ROOT"
+else
+  _log "cwd-recovery-failed: $REPO_ROOT missing or cd failed — aborting"
+  printf 'failed' > "$DEDUP_FILE" 2>/dev/null
+  exit 0
 fi
 _log "cwd(effective): $(pwd)"
 _log "REFLECTIONS_DIR: $REFLECTIONS_DIR"

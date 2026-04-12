@@ -29,7 +29,7 @@ ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 # Load config
 . "$ROOT/core/lib/load-config.sh"
 
-REFLECTIONS_DIR=".reinforce/reflections"
+REFLECTIONS_DIR="$(dirname "$ROOT")/.reinforce/reflections"
 DATESTAMP=$(date '+%Y-%m-%d-%H%M' 2>/dev/null || echo "undated")
 TARGET_FILE="$REFLECTIONS_DIR/test-${DATESTAMP}.md"
 
