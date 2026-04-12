@@ -1,11 +1,13 @@
-You are reviewing a completed coding session. Analyze the conversation above and decide whether it contains substantive work worth reflecting on.
+You are reviewing a completed coding session. Your default action is to **write a reflection file**. Skipping is an exception, not the norm — the project values having a snapshot of every working session over having a curated subset of "interesting" ones. Empty or "None"/"Clean" sections are explicitly allowed and expected for routine sessions.
 
-**Skip reflection** (write nothing, output nothing) if:
-- The session was trivial (just a question, a quick lookup, fewer than ~5 meaningful exchanges)
-- The session was interrupted before meaningful work happened
-- No lessons, mistakes, decisions, or outcomes worth capturing
+**Skip reflection** (write nothing, output nothing) ONLY if ALL of these hold:
+- Fewer than 3 tool calls were made
+- No file edits, writes, or commits happened
+- No decisions, mistakes, or user corrections occurred
 
-**If the session IS worth reflecting on**, write a reflection file to `{{REFLECTIONS_DIR}}/{{DATESTAMP}}.md` using this exact template:
+If you are uncertain whether a session qualifies as "trivial", **write the reflection**. A thin reflection is strictly better than no reflection — it still counts as a snapshot for the retro cycle.
+
+**Write the reflection file** to `{{REFLECTIONS_DIR}}/{{DATESTAMP}}.md` using this exact template:
 
 ```markdown
 # Session Reflection
@@ -40,4 +42,4 @@ You are reviewing a completed coding session. Analyze the conversation above and
 (1-2 concrete changes; each must name a specific file, tool, command, or practice — "be more careful" is not an action item)
 ```
 
-Write ONLY the reflection file. Do not explain your reasoning. If the session is not worth reflecting on, output nothing.
+Write ONLY the reflection file. Do not explain your reasoning. Remember: skip only when ALL three trivial conditions hold; when in doubt, write the file.
