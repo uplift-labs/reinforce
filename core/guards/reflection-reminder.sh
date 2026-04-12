@@ -19,8 +19,9 @@ SESSION_ID=$(json_field "session_id" "$INPUT")
 MARKER="/tmp/reinforce-reminder-${SESSION_ID}"
 [ -f "$MARKER" ] && exit 0
 
-# Reflections dir and threshold (from config / env / defaults via load-config.sh)
-REFLECTIONS_DIR=".reinforce/reflections"
+# Reflections dir (absolute — must not depend on CWD, which may be a worktree)
+_REINFORCE_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+REFLECTIONS_DIR="$(dirname "$_REINFORCE_ROOT")/.reinforce/reflections"
 THRESHOLD="$REINFORCE_REMINDER_THRESHOLD"
 
 [ ! -d "$REFLECTIONS_DIR" ] && exit 0
