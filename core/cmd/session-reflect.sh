@@ -112,6 +112,12 @@ _before=$(ls "$REFLECTIONS_DIR" 2>/dev/null | wc -l)
 WATCHDOG_SEC="${REINFORCE_CLAUDE_WATCHDOG_SEC:-240}"
 _run_with_timeout() {
   local _pid _exit_code
+  # Env vars prevent the nested `claude` subprocess from re-entering all
+  # hooks installed in the parent session (singularity guards, task-proof,
+  # reinforce itself) and causing a fan-out process explosion on session
+  # end. SINGULARITY_NESTED is read by singularity's guard-multiplexer;
+  # TASK_PROOF_DISABLED and REINFORCE_DISABLED disable those pipelines.
+  SINGULARITY_NESTED=1 TASK_PROOF_DISABLED=1 REINFORCE_DISABLED=1 \
   claude --resume "$SESSION_ID" -p "$PROMPT" \
     --dangerously-skip-permissions \
     --model "$MODEL" \
