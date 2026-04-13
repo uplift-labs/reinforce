@@ -73,6 +73,9 @@ echo ""
 
 MODEL="$REINFORCE_REFLECT_MODEL"
 
+# Env vars prevent nested-session recursion if this debug tool is ever
+# run from inside an active Claude Code session (see session-reflect.sh).
+SINGULARITY_NESTED=1 TASK_PROOF_DISABLED=1 REINFORCE_DISABLED=1 \
 claude --resume "$SESSION_ID" -p "$PROMPT" \
   --dangerously-skip-permissions \
   --model "$MODEL" \
