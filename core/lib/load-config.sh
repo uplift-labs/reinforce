@@ -11,8 +11,9 @@
 #   . "$(dirname "$0")/../lib/load-config.sh"
 
 # --- Locate config file ---
-# Try .reinforce/config relative to working directory (project root)
-_reinforce_config="${REINFORCE_CONFIG_FILE:-.reinforce/config}"
+# Derive install dir from this script's location (core/lib/load-config.sh → install root)
+_reinforce_install_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." 2>/dev/null && pwd)"
+_reinforce_config="${REINFORCE_CONFIG_FILE:-$_reinforce_install_dir/config}"
 
 # --- Built-in defaults ---
 _reinforce_default_disabled="false"

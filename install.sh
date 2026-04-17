@@ -2,7 +2,7 @@
 # install.sh — install reinforce into a target git repo.
 #
 # Usage:
-#   bash install.sh [--target <repo-dir>] [--with-claude-code]
+#   bash install.sh [--target <repo-dir>] [--prefix <dir>] [--with-claude-code]
 #
 # By default installs only the core guards. With --with-claude-code,
 # also installs the Claude Code adapter hooks, merges hook config
@@ -12,11 +12,13 @@ set -u
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 TARGET=""
+PREFIX=".uplift"
 WITH_CC=0
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --target)           TARGET="$2"; shift 2 ;;
+    --prefix)           PREFIX="$2"; shift 2 ;;
     --with-claude-code) WITH_CC=1; shift ;;
     -h|--help)
       sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'
@@ -30,7 +32,18 @@ done
 # .git is a directory in normal repos, a file in worktrees
 [ -d "$TARGET/.git" ] || [ -f "$TARGET/.git" ] || { printf 'not a git repo: %s\n' "$TARGET" >&2; exit 1; }
 
-INSTALL_ROOT="$TARGET/.reinforce"
+# --- Migration from legacy path ---
+migrate_old_path() {
+  local old="$1" new="$2"
+  [ -d "$old" ] || return 0
+  [ -d "$new" ] && { printf '[migrate] both %s and %s exist — manual merge needed\n' "$old" "$new" >&2; return 1; }
+  mkdir -p "$(dirname "$new")"
+  mv "$old" "$new"
+  printf '[migrate] moved %s → %s\n' "$old" "$new"
+}
+
+INSTALL_ROOT="$TARGET/$PREFIX/reinforce"
+migrate_old_path "$TARGET/.reinforce" "$INSTALL_ROOT"
 mkdir -p "$INSTALL_ROOT/core/lib" "$INSTALL_ROOT/core/cmd" "$INSTALL_ROOT/core/guards"
 mkdir -p "$INSTALL_ROOT/reflections"
 
@@ -80,8 +93,12 @@ if [ "$WITH_CC" -eq 1 ]; then
   cp "$SCRIPT_DIR/skills/reinforce/SKILL.md" "$SKILL_DEST/SKILL.md"
   printf '[reinforce] skill installed at %s\n' "$SKILL_DEST"
 
-  # Merge hooks into settings.json
-  SNIPPET="$SCRIPT_DIR/adapters/claude-code/settings-hooks.json"
+  # Patch settings-hooks.json template for the actual PREFIX before merging.
+  _SRC_SNIPPET="$SCRIPT_DIR/adapters/claude-code/settings-hooks.json"
+  PATCHED_SNIPPET=$(mktemp)
+  sed "s|/\\.reinforce/adapter/hooks/|/$PREFIX/reinforce/adapter/hooks/|g" "$_SRC_SNIPPET" > "$PATCHED_SNIPPET"
+  trap 'rm -f "$PATCHED_SNIPPET"' EXIT
+
   SETTINGS="$TARGET/.claude/settings.json"
   mkdir -p "$TARGET/.claude"
 
@@ -91,7 +108,7 @@ if [ "$WITH_CC" -eq 1 ]; then
     exit 1
   fi
   printf '[reinforce] merging hooks into %s\n' "$SETTINGS"
-  python3 "$MERGER" "$SETTINGS" "$SNIPPET"
+  python3 "$MERGER" "$SETTINGS" "$PATCHED_SNIPPET"
 fi
 
 printf '[reinforce] done.\n'
@@ -99,5 +116,5 @@ printf '  core installed at:  %s\n' "$INSTALL_ROOT/core"
 printf '  reflections dir:    %s\n' "$INSTALL_ROOT/reflections"
 [ "$WITH_CC" -eq 1 ] && printf '  claude-code adapter: %s\n' "$INSTALL_ROOT/adapter"
 [ "$WITH_CC" -eq 1 ] && printf '  retro skill:         %s\n' "$TARGET/.claude/skills/reinforce"
-printf '\n  Commit .reinforce/ (and .claude/ if using Claude Code)\n'
+printf '\n  Commit %s/ (and .claude/ if using Claude Code)\n' "$INSTALL_ROOT"
 printf '  so that guards are available in worktrees.\n'

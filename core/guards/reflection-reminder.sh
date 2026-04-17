@@ -20,8 +20,8 @@ MARKER="/tmp/reinforce-reminder-${SESSION_ID}"
 [ -f "$MARKER" ] && exit 0
 
 # Reflections dir (absolute — must not depend on CWD, which may be a worktree)
-_REINFORCE_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-REFLECTIONS_DIR="$(dirname "$_REINFORCE_ROOT")/.reinforce/reflections"
+_REINFORCE_ROOT="$(cd "$(dirname "$0")/../.." 2>/dev/null && pwd)"
+REFLECTIONS_DIR="$_REINFORCE_ROOT/reflections"
 THRESHOLD="$REINFORCE_REMINDER_THRESHOLD"
 
 [ ! -d "$REFLECTIONS_DIR" ] && exit 0

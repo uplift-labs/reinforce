@@ -38,8 +38,8 @@ fi
 [ -n "${GITHUB_ACTIONS:-}" ] && exit 0
 
 # --- Paths (absolute — must not depend on CWD, which may be a worktree) ---
-REPO_ROOT="$(dirname "$REINFORCE_ROOT")"
-REFLECTIONS_DIR="$REPO_ROOT/.reinforce/reflections"
+REPO_ROOT="$(git -C "$(dirname "$REINFORCE_ROOT")" rev-parse --show-toplevel 2>/dev/null || dirname "$REINFORCE_ROOT")"
+REFLECTIONS_DIR="$REINFORCE_ROOT/reflections"
 STATE_DIR="/tmp/reinforce-sessions"
 mkdir -p "$STATE_DIR" 2>/dev/null || exit 0
 
