@@ -10,3 +10,8 @@ reminder_threshold=5
 
 # Model for background reflection (opus, sonnet, haiku)
 reflect_model=opus
+
+# Codex reflection settings. Empty model means "use Codex default/config".
+codex_reflect_model=
+codex_reflect_reasoning_effort=medium
+codex_reflect_timeout_sec=240

@@ -2,7 +2,7 @@
 # remote-install.sh — one-liner remote installer for reinforce.
 #
 # Usage:
-#   bash <(curl -sSL https://raw.githubusercontent.com/uplift-labs/reinforce/main/remote-install.sh) [--prefix <dir>] [--with-claude-code]
+#   bash <(curl -sSL https://raw.githubusercontent.com/uplift-labs/reinforce/main/remote-install.sh) [--prefix <dir>] [--with-claude-code] [--with-codex]
 #
 # Environment:
 #   REINFORCE_VERSION — git tag to install (default: main)

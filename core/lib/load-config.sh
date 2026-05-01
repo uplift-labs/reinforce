@@ -1,10 +1,10 @@
 #!/bin/bash
-# load-config.sh — Load .reinforce/config into REINFORCE_* variables.
+# load-config.sh — Load installed reinforce config into REINFORCE_* variables.
 # Source this file; it exports nothing, only sets variables if not already set.
 #
 # Config lookup order:
 #   1. Environment variable (highest priority — always wins)
-#   2. .reinforce/config in project root
+#   2. installed reinforce config
 #   3. Built-in defaults (lowest priority)
 #
 # Usage:
@@ -19,11 +19,17 @@ _reinforce_config="${REINFORCE_CONFIG_FILE:-$_reinforce_install_dir/config}"
 _reinforce_default_disabled="false"
 _reinforce_default_reminder_threshold="5"
 _reinforce_default_reflect_model="opus"
+_reinforce_default_codex_reflect_model=""
+_reinforce_default_codex_reflect_reasoning_effort="medium"
+_reinforce_default_codex_reflect_timeout_sec="240"
 
 # --- Parse config file into associative-style variables ---
 _reinforce_cfg_disabled=""
 _reinforce_cfg_reminder_threshold=""
 _reinforce_cfg_reflect_model=""
+_reinforce_cfg_codex_reflect_model=""
+_reinforce_cfg_codex_reflect_reasoning_effort=""
+_reinforce_cfg_codex_reflect_timeout_sec=""
 
 if [ -f "$_reinforce_config" ]; then
   while IFS='=' read -r _key _val; do
@@ -38,6 +44,9 @@ if [ -f "$_reinforce_config" ]; then
       disabled)            _reinforce_cfg_disabled="$_val" ;;
       reminder_threshold)  _reinforce_cfg_reminder_threshold="$_val" ;;
       reflect_model)       _reinforce_cfg_reflect_model="$_val" ;;
+      codex_reflect_model) _reinforce_cfg_codex_reflect_model="$_val" ;;
+      codex_reflect_reasoning_effort) _reinforce_cfg_codex_reflect_reasoning_effort="$_val" ;;
+      codex_reflect_timeout_sec) _reinforce_cfg_codex_reflect_timeout_sec="$_val" ;;
     esac
   done < "$_reinforce_config"
 fi
@@ -46,6 +55,9 @@ fi
 REINFORCE_DISABLED="${REINFORCE_DISABLED:-${_reinforce_cfg_disabled:-$_reinforce_default_disabled}}"
 REINFORCE_REMINDER_THRESHOLD="${REINFORCE_REMINDER_THRESHOLD:-${_reinforce_cfg_reminder_threshold:-$_reinforce_default_reminder_threshold}}"
 REINFORCE_REFLECT_MODEL="${REINFORCE_REFLECT_MODEL:-${_reinforce_cfg_reflect_model:-$_reinforce_default_reflect_model}}"
+REINFORCE_CODEX_REFLECT_MODEL="${REINFORCE_CODEX_REFLECT_MODEL:-${_reinforce_cfg_codex_reflect_model:-$_reinforce_default_codex_reflect_model}}"
+REINFORCE_CODEX_REFLECT_REASONING_EFFORT="${REINFORCE_CODEX_REFLECT_REASONING_EFFORT:-${_reinforce_cfg_codex_reflect_reasoning_effort:-$_reinforce_default_codex_reflect_reasoning_effort}}"
+REINFORCE_CODEX_REFLECT_TIMEOUT_SEC="${REINFORCE_CODEX_REFLECT_TIMEOUT_SEC:-${_reinforce_cfg_codex_reflect_timeout_sec:-$_reinforce_default_codex_reflect_timeout_sec}}"
 
 # Normalize disabled: accept true/1/yes → "1", everything else → ""
 case "$REINFORCE_DISABLED" in
@@ -55,5 +67,7 @@ esac
 
 # Cleanup temp vars
 unset _reinforce_config _reinforce_default_disabled _reinforce_default_reminder_threshold _reinforce_default_reflect_model
+unset _reinforce_default_codex_reflect_model _reinforce_default_codex_reflect_reasoning_effort _reinforce_default_codex_reflect_timeout_sec
 unset _reinforce_cfg_disabled _reinforce_cfg_reminder_threshold _reinforce_cfg_reflect_model
+unset _reinforce_cfg_codex_reflect_model _reinforce_cfg_codex_reflect_reasoning_effort _reinforce_cfg_codex_reflect_timeout_sec
 unset _key _val

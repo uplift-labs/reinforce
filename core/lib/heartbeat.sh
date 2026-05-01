@@ -1,17 +1,17 @@
 #!/bin/bash
 # heartbeat.sh — Background PID monitor for reinforce reflection.
 #
-# Launched by the session-start adapter hook. Monitors the parent Claude Code
-# process. When the parent dies, invokes session-reflect.sh to generate a
-# background reflection via `claude -p`.
+# Launched by the session-start adapter hook. Monitors the parent host process.
+# When the parent dies, invokes the host reflection backend in the background.
 #
 # Usage:
 #   bash heartbeat.sh --marker <path> --session-id <id> --reinforce-root <path> \
+#                      [--host claude|codex] [--transcript-path <path>] \
 #                      [--pid <target-pid>] [--parent-winpid <windows-pid>] \
 #                      [--interval <seconds>] [--max-age <seconds>]
 #
 # Sidecar file:
-#   Writes "<heartbeat_pid> <parent_winpid|0> <monitored_pid|0>" to
+#   Writes "<heartbeat_pid> <parent_winpid|0> <monitored_pid|0> <transcript_path>" to
 #   "${MARKER}.hb" on startup. Used by session-start.sh to kill old heartbeats.
 #
 # Exit conditions (all graceful):
@@ -30,6 +30,8 @@ REINFORCE_ROOT=""
 INTERVAL=2
 MAX_AGE=86400   # 24 hours — safety valve
 PARENT_WINPID=""
+HOST="claude"
+TRANSCRIPT_PATH=""
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -40,6 +42,8 @@ while [ $# -gt 0 ]; do
     --interval)       INTERVAL="$2";       shift 2 ;;
     --max-age)        MAX_AGE="$2";        shift 2 ;;
     --parent-winpid)  PARENT_WINPID="$2";  shift 2 ;;
+    --host)           HOST="$2";           shift 2 ;;
+    --transcript-path) TRANSCRIPT_PATH="$2"; shift 2 ;;
     *) shift ;;
   esac
 done
@@ -78,7 +82,7 @@ trap cleanup EXIT
 # SIGHUP arrives when the terminal closes. Treat it as parent death.
 trap '_parent_died=1' HUP
 
-printf '%s %s %s\n' "$$" "${PARENT_WINPID:-0}" "${PID:-0}" > "$_hb_sidecar" 2>/dev/null || exit 1
+printf '%s %s %s %s\n' "$$" "${PARENT_WINPID:-0}" "${PID:-0}" "${TRANSCRIPT_PATH:-}" > "$_hb_sidecar" 2>/dev/null || exit 1
 
 _start=$(date +%s)
 _tick=0
@@ -120,13 +124,21 @@ done
 
 # --- On parent death: trigger background reflection ---
 if [ "$_parent_died" = 1 ]; then
-  _reflect_log="/tmp/reinforce-sessions/heartbeat-${SESSION_ID}.log"
+  _reflect_log="$(dirname "$MARKER")/heartbeat-${SESSION_ID}.log"
   printf '[%s] heartbeat: parent died, triggering session-reflect\n' \
     "$(date '+%H:%M:%S' 2>/dev/null)" > "$_reflect_log" 2>/dev/null
-  bash "$REINFORCE_ROOT/core/cmd/session-reflect.sh" \
-    --session-id "$SESSION_ID" \
-    --reinforce-root "$REINFORCE_ROOT" \
-    </dev/null >> "$_reflect_log" 2>&1 &
+  if [ "$HOST" = "codex" ]; then
+    _cmd=(bash "$REINFORCE_ROOT/core/cmd/session-reflect-codex.sh"
+      --session-id "$SESSION_ID"
+      --reinforce-root "$REINFORCE_ROOT")
+    [ -n "$TRANSCRIPT_PATH" ] && _cmd+=(--transcript-path "$TRANSCRIPT_PATH")
+    "${_cmd[@]}" </dev/null >> "$_reflect_log" 2>&1 &
+  else
+    bash "$REINFORCE_ROOT/core/cmd/session-reflect.sh" \
+      --session-id "$SESSION_ID" \
+      --reinforce-root "$REINFORCE_ROOT" \
+      </dev/null >> "$_reflect_log" 2>&1 &
+  fi
 fi
 
 exit 0
