@@ -11,8 +11,16 @@ import json
 import sys
 from pathlib import Path
 
-MARKER = "/reinforce/adapter/hooks/"
-LEGACY_MARKERS = [".reinforce/adapter/hooks/"]
+MARKERS = [
+    "/reinforce/adapter/hooks/",
+    "/reinforce/adapters/claude-code/hooks/",
+    "/reinforce/adapters/codex/hooks/",
+]
+LEGACY_MARKERS = [
+    ".reinforce/adapter/hooks/",
+    ".reinforce/adapters/claude-code/hooks/",
+    ".reinforce/adapters/codex/hooks/",
+]
 
 
 def hook_key(hook):
@@ -27,7 +35,7 @@ def hook_key(hook):
 def is_reinforce_hook(hook):
     """Check if a hook was installed by reinforce."""
     cmd = hook.get("command", "")
-    if MARKER in cmd:
+    if any(m in cmd for m in MARKERS):
         return True
     return any(m in cmd for m in LEGACY_MARKERS)
 

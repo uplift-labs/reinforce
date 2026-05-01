@@ -10,7 +10,7 @@
 #   bash core/cmd/test-reflect.sh [--session-id <id>]
 #
 # If --session-id is omitted, uses the most recent session from state dir.
-# Writes result to .reinforce/reflections/test-<timestamp>.md
+# Writes result to <install-root>/reflections/test-<timestamp>.md
 
 set -u
 
