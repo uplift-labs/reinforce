@@ -1,13 +1,15 @@
-You are reviewing a completed coding session. Your default action is to **write a reflection file**. Skipping is an exception, not the norm — the project values having a snapshot of every working session over having a curated subset of "interesting" ones. Empty or "None"/"Clean" sections are explicitly allowed and expected for routine sessions.
+You are reviewing a completed OpenCode coding session transcript attached as a file. Your default action is to output a reflection in markdown. Skipping is an exception, not the norm — the project values having a snapshot of every working session over having a curated subset of "interesting" ones.
 
-**Skip reflection** (write nothing, output nothing) ONLY if ALL of these hold:
-- Fewer than 3 tool calls were made
+The transcript is JSON Lines captured from OpenCode events. It may include prompts, assistant text, tool calls, tool results, errors, status transitions, and truncation markers.
+
+**Skip reflection** by outputting exactly `SKIP` ONLY if ALL of these hold:
+- Fewer than 3 meaningful events or tool calls happened
 - No file edits, writes, or commits happened
 - No decisions, mistakes, or user corrections occurred
 
-If you are uncertain whether a session qualifies as "trivial", **write the reflection**. A thin reflection is strictly better than no reflection — it still counts as a snapshot for the retro cycle.
+If you are uncertain whether a session qualifies as "trivial", output the reflection. A thin reflection is strictly better than no reflection — it still counts as a snapshot for the retro cycle.
 
-**Write the reflection file** to `{{REFLECTION_FILE}}` using this exact template:
+Output ONLY the reflection markdown using this exact template:
 
 ```markdown
 # Session Reflection
@@ -24,7 +26,7 @@ If you are uncertain whether a session qualifies as "trivial", **write the refle
 (approaches, tools, or strategies that proved effective — name specific files, commands, or techniques; if nothing notable, write "Routine session, no standout wins")
 
 ## Mistakes and corrections
-(for each mistake: what you tried → why it failed → what signal told you to change → what fixed it; if no mistakes, write "None")
+(for each mistake: what you tried -> why it failed -> what signal told you to change -> what fixed it; if no mistakes, write "None")
 
 ## What was left undone
 (incomplete items with reason: blocked by X, deferred because Y, ran out of context; if nothing, write "All goals met")
@@ -36,10 +38,10 @@ If you are uncertain whether a session qualifies as "trivial", **write the refle
 (check for these issues in the session: scope drift from initial request, sycophantic agreement without evidence, test gaps for changed business logic, dismissed user concerns. Note any issues found or write "Clean")
 
 ## Lesson learned
-(format: WHEN [specific trigger] → DO [specific action] BECAUSE [evidence from this session]; not generic advice)
+(format: WHEN [specific trigger] -> DO [specific action] BECAUSE [evidence from this session]; not generic advice)
 
 ## Action items
 (1-2 concrete changes; each must name a specific file, tool, command, or practice — "be more careful" is not an action item)
 ```
 
-Write ONLY the reflection file. Do not explain your reasoning. Remember: skip only when ALL three trivial conditions hold; when in doubt, write the file.
+Do not wrap the result in code fences. Do not explain your reasoning. Do not modify files or run tools; only read the attached transcript and produce the reflection.

@@ -2,7 +2,7 @@
 # install.sh — install reinforce into a target git repo.
 #
 # Usage:
-#   bash install.sh [--target <repo-dir>] [--prefix <dir>] [--with-claude-code] [--with-codex]
+#   bash install.sh [--target <repo-dir>] [--prefix <dir>] [--with-claude-code] [--with-codex] [--with-opencode]
 #
 # By default installs only the core guards. Host flags install adapter hooks
 # and copy the reinforce skill into the host-specific discovery location.
@@ -14,6 +14,7 @@ TARGET=""
 PREFIX=".uplift"
 WITH_CC=0
 WITH_CODEX=0
+WITH_OPENCODE=0
 TMP_FILES=""
 
 cleanup_install_tmp() {
@@ -28,6 +29,7 @@ while [ $# -gt 0 ]; do
     --prefix)           PREFIX="$2"; shift 2 ;;
     --with-claude-code) WITH_CC=1; shift ;;
     --with-codex)       WITH_CODEX=1; shift ;;
+    --with-opencode)    WITH_OPENCODE=1; shift ;;
     -h|--help)
       sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'
       exit 0
@@ -69,6 +71,54 @@ sync_sh_dir() {
     printf 'install: copy failed %s -> %s\n' "$src" "$dest" >&2
     exit 1
   }
+}
+
+detect_bash_command() {
+  if [ -n "${REINFORCE_BASH:-}" ]; then
+    printf '%s' "$REINFORCE_BASH"
+    return 0
+  fi
+
+  case "$(uname -s 2>/dev/null)" in
+    MINGW*|MSYS*|CYGWIN*)
+      for _bash_candidate in \
+        "/c/Program Files/Git/bin/bash.exe" \
+        "/c/Program Files/Git/usr/bin/bash.exe" \
+        "${LOCALAPPDATA:-}/Programs/Git/bin/bash.exe"; do
+        [ -x "$_bash_candidate" ] || continue
+        if command -v cygpath >/dev/null 2>&1; then
+          cygpath -m "$_bash_candidate"
+        else
+          printf '%s' "$_bash_candidate"
+        fi
+        return 0
+      done
+      ;;
+  esac
+
+  command -v bash 2>/dev/null || printf 'bash'
+}
+
+patch_hook_bash_commands() {
+  local json_file="$1" bash_command="$2"
+  python3 - "$json_file" "$bash_command" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+bash_command = sys.argv[2].replace('\\', '/')
+
+data = json.loads(path.read_text(encoding='utf-8'))
+for entries in data.get('hooks', {}).values():
+    for group in entries:
+        for hook in group.get('hooks', []):
+            command = hook.get('command')
+            if isinstance(command, str) and command.startswith('bash '):
+                hook['command'] = f'"{bash_command}" {command[len("bash "):]}'
+
+path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + '\n', encoding='utf-8')
+PY
 }
 
 printf '[reinforce] copying core to %s\n' "$INSTALL_ROOT/core"
@@ -154,11 +204,32 @@ if [ "$WITH_CODEX" -eq 1 ]; then
     exit 1
   fi
 
+  patch_hook_bash_commands "$PATCHED_CODEX_SNIPPET" "$(detect_bash_command)"
+
   printf '[reinforce] merging Codex hooks into %s\n' "$CODEX_HOOKS"
   python3 "$MERGER" "$CODEX_HOOKS" "$PATCHED_CODEX_SNIPPET"
 
   printf '[reinforce] enabling Codex hooks in %s\n' "$CODEX_CONFIG"
   python3 "$TOML_SET" "$CODEX_CONFIG" features codex_hooks true
+fi
+
+if [ "$WITH_OPENCODE" -eq 1 ]; then
+  OPENCODE_ADAPTER_DIR="$INSTALL_ROOT/adapters/opencode"
+  mkdir -p "$OPENCODE_ADAPTER_DIR/plugins"
+  printf '[reinforce] copying OpenCode adapter to %s\n' "$OPENCODE_ADAPTER_DIR"
+  sed "s|__REINFORCE_PREFIX__|$PREFIX|g" \
+    "$SCRIPT_DIR/adapters/opencode/plugins/reinforce.ts" > "$OPENCODE_ADAPTER_DIR/plugins/reinforce.ts"
+
+  OPENCODE_PLUGIN_DIR="$TARGET/.opencode/plugins"
+  mkdir -p "$OPENCODE_PLUGIN_DIR"
+  sed "s|__REINFORCE_PREFIX__|$PREFIX|g" \
+    "$SCRIPT_DIR/adapters/opencode/plugins/reinforce.ts" > "$OPENCODE_PLUGIN_DIR/reinforce.ts"
+  printf '[reinforce] OpenCode plugin installed at %s\n' "$OPENCODE_PLUGIN_DIR/reinforce.ts"
+
+  OPENCODE_SKILL_DEST="$TARGET/.opencode/skills/reinforce"
+  mkdir -p "$OPENCODE_SKILL_DEST"
+  cp "$SCRIPT_DIR/skills/reinforce/SKILL.md" "$OPENCODE_SKILL_DEST/SKILL.md"
+  printf '[reinforce] OpenCode skill installed at %s\n' "$OPENCODE_SKILL_DEST"
 fi
 
 printf '[reinforce] done.\n'
@@ -169,9 +240,15 @@ printf '  reflections dir:    %s\n' "$INSTALL_ROOT/reflections"
 [ "$WITH_CODEX" -eq 1 ] && printf '  codex adapter:       %s\n' "$CODEX_ADAPTER_DIR"
 [ "$WITH_CODEX" -eq 1 ] && printf '  codex hooks:         %s\n' "$TARGET/.codex/hooks.json"
 [ "$WITH_CODEX" -eq 1 ] && printf '  codex skill:         %s\n' "$TARGET/.agents/skills/reinforce"
+[ "$WITH_OPENCODE" -eq 1 ] && printf '  opencode adapter:    %s\n' "$OPENCODE_ADAPTER_DIR"
+[ "$WITH_OPENCODE" -eq 1 ] && printf '  opencode plugin:     %s\n' "$TARGET/.opencode/plugins/reinforce.ts"
+[ "$WITH_OPENCODE" -eq 1 ] && printf '  opencode skill:      %s\n' "$TARGET/.opencode/skills/reinforce"
 printf '\n  Commit %s/' "$INSTALL_ROOT"
 [ "$WITH_CC" -eq 1 ] && printf ' and .claude/'
 [ "$WITH_CODEX" -eq 1 ] && printf ' and .codex/ and .agents/'
+[ "$WITH_OPENCODE" -eq 1 ] && printf ' and .opencode/'
 printf '\n'
 printf '  so that guards are available in worktrees.\n'
 [ "$WITH_CODEX" -eq 1 ] && printf '  Codex project-local hooks require this project to be trusted by Codex.\n'
+[ "$WITH_OPENCODE" -eq 1 ] && printf '  OpenCode project-local plugins require this project config to be trusted by OpenCode.\n'
+exit 0

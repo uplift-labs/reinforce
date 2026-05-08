@@ -1,13 +1,13 @@
 #!/bin/bash
-# session-reflect-codex.sh - Background reflection orchestrator for Codex.
+# session-reflect-opencode.sh - Background reflection orchestrator for OpenCode.
 #
-# Reads a Codex transcript and asks `codex exec` to summarize it into a
-# reflection. The nested Codex run is read-only; this script writes the final
-# markdown file itself to keep file writes deterministic.
+# Reads an OpenCode event transcript and asks an external command to summarize it
+# into a reflection. By default the command is `opencode run`; users may override
+# it with REINFORCE_OPENCODE_REFLECT_COMMAND / opencode_reflect_command.
 #
 # Usage:
-#   bash session-reflect-codex.sh --session-id <id> --transcript-path <path> \
-#                                [--reinforce-root <path>]
+#   bash session-reflect-opencode.sh --session-id <id> --transcript-path <path> \
+#                                   [--reinforce-root <path>]
 #
 # Always exits 0 (fail-open). Never blocks the user session.
 
@@ -42,11 +42,11 @@ fi
 _safe_session=$(printf '%s' "$SESSION_ID" | tr '/\\:' '___')
 PROJECT_ROOT="$(git -C "$REINFORCE_ROOT" rev-parse --show-toplevel 2>/dev/null || dirname "$(dirname "$REINFORCE_ROOT")")"
 PROJECT_HASH=$(printf '%s' "$PROJECT_ROOT" | tr '/\\:' '___')
-STATE_DIR="/tmp/reinforce-sessions/codex/$PROJECT_HASH"
+STATE_DIR="/tmp/reinforce-sessions/opencode/$PROJECT_HASH"
 mkdir -p "$STATE_DIR" 2>/dev/null || exit 0
+
 DEDUP_FILE="$STATE_DIR/${_safe_session}.reflect"
 LOCK_DIR="$STATE_DIR/${_safe_session}.lock"
-
 _dedup_state=$(cat "$DEDUP_FILE" 2>/dev/null || true)
 case "$_dedup_state" in
   done|skipped) exit 0 ;;
@@ -61,57 +61,68 @@ trap cleanup_lock EXIT
 
 printf 'claimed' > "$DEDUP_FILE" 2>/dev/null
 
-command -v codex >/dev/null 2>&1 || { rm -f "$DEDUP_FILE" 2>/dev/null; exit 0; }
 [ -f "$TRANSCRIPT_PATH" ] || { rm -f "$DEDUP_FILE" 2>/dev/null; exit 0; }
 
-REPO_ROOT="$(git -C "$(dirname "$REINFORCE_ROOT")" rev-parse --show-toplevel 2>/dev/null || dirname "$REINFORCE_ROOT")"
 REFLECTIONS_DIR="$REINFORCE_ROOT/reflections"
 mkdir -p "$REFLECTIONS_DIR" 2>/dev/null || true
 
 DATESTAMP=$(date '+%Y-%m-%d-%H%M%S' 2>/dev/null || echo "undated")
-TARGET_FILE="$REFLECTIONS_DIR/${DATESTAMP}-codex-${_safe_session}-$$.md"
-TEMPLATE_FILE="$REINFORCE_ROOT/core/templates/reflection-output-prompt.md"
+TARGET_FILE="$REFLECTIONS_DIR/${DATESTAMP}-opencode-${_safe_session}-$$.md"
+TEMPLATE_FILE="$REINFORCE_ROOT/core/templates/reflection-output-prompt-opencode.md"
 
 if [ -f "$TEMPLATE_FILE" ]; then
   PROMPT=$(cat "$TEMPLATE_FILE" 2>/dev/null)
 else
-  PROMPT="Review the Codex transcript provided on stdin. If trivial, output exactly SKIP. Otherwise output a markdown reflection with sections: Goal, Outcome, What worked, Mistakes and corrections, What was left undone, Key decision, Quality check, Lesson learned, Action items."
+  PROMPT="Review the attached OpenCode transcript. If trivial, output exactly SKIP. Otherwise output a markdown reflection with sections: Goal, Outcome, What worked, Mistakes and corrections, What was left undone, Key decision, Quality check, Lesson learned, Action items."
 fi
 
-PROMPT=$(printf '%s' "$PROMPT" \
-  | sed "s|{{DATESTAMP}}|$DATESTAMP|g")
+PROMPT=$(printf '%s' "$PROMPT" | sed "s|{{DATESTAMP}}|$DATESTAMP|g")
 
-LOG_FILE="$STATE_DIR/session-reflect-codex-${_safe_session}.log"
-OUT_FILE="$STATE_DIR/session-reflect-codex-${_safe_session}.out"
+LOG_FILE="$STATE_DIR/session-reflect-opencode-${_safe_session}.log"
+OUT_FILE="$STATE_DIR/session-reflect-opencode-${_safe_session}.out"
 
 _log() { printf '[%s] %s\n' "$(date '+%H:%M:%S' 2>/dev/null)" "$*" >> "$LOG_FILE" 2>/dev/null; }
 
-_log "session-reflect-codex started for $_safe_session"
+_log "session-reflect-opencode started for $_safe_session"
 _log "REINFORCE_ROOT: $REINFORCE_ROOT"
 _log "TRANSCRIPT_PATH: $TRANSCRIPT_PATH"
 
-if [ -d "$REPO_ROOT" ] && cd "$REPO_ROOT" 2>/dev/null; then
-  _log "cwd-set: $REPO_ROOT"
+if [ -d "$PROJECT_ROOT" ] && cd "$PROJECT_ROOT" 2>/dev/null; then
+  _log "cwd-set: $PROJECT_ROOT"
 else
-  _log "cwd-recovery-failed: $REPO_ROOT missing or cd failed"
+  _log "cwd-recovery-failed: $PROJECT_ROOT missing or cd failed"
   printf 'failed' > "$DEDUP_FILE" 2>/dev/null
   exit 0
 fi
 
-WATCHDOG_SEC="${REINFORCE_CODEX_WATCHDOG_SEC:-${REINFORCE_CODEX_REFLECT_TIMEOUT_SEC:-240}}"
-MODEL="${REINFORCE_CODEX_REFLECT_MODEL:-}"
-EFFORT="${REINFORCE_CODEX_REFLECT_REASONING_EFFORT:-medium}"
+WATCHDOG_SEC="${REINFORCE_OPENCODE_WATCHDOG_SEC:-${REINFORCE_OPENCODE_REFLECT_TIMEOUT_SEC:-240}}"
+MODEL="${REINFORCE_OPENCODE_REFLECT_MODEL:-}"
+CUSTOM_COMMAND="${REINFORCE_OPENCODE_REFLECT_COMMAND:-}"
+
+_spawn_reflector() {
+  if [ -n "$CUSTOM_COMMAND" ]; then
+    REINFORCE_DISABLED=1 \
+    REINFORCE_REFLECT_PROMPT="$PROMPT" \
+    REINFORCE_TRANSCRIPT_PATH="$TRANSCRIPT_PATH" \
+    REINFORCE_REPO_ROOT="$PROJECT_ROOT" \
+    REINFORCE_OUTPUT_FILE="$OUT_FILE" \
+      bash -lc "$CUSTOM_COMMAND" < "$TRANSCRIPT_PATH" > "$OUT_FILE" 2>> "$LOG_FILE" &
+    return
+  fi
+
+  command -v opencode >/dev/null 2>&1 || { rm -f "$DEDUP_FILE" 2>/dev/null; return 127; }
+  local _cmd=(opencode run --pure --format default --dir "$PROJECT_ROOT" --file "$TRANSCRIPT_PATH")
+  [ -n "$MODEL" ] && _cmd+=(--model "$MODEL")
+  _cmd+=("$PROMPT")
+  REINFORCE_DISABLED=1 "${_cmd[@]}" > "$OUT_FILE" 2>> "$LOG_FILE" &
+}
 
 _run_with_timeout() {
   local _pid _exit_code _watchdog
-  local _cmd=(codex exec -C "$REPO_ROOT" --sandbox read-only --ask-for-approval never -c features.codex_hooks=false)
-  [ -n "$MODEL" ] && _cmd+=(--model "$MODEL")
-  [ -n "$EFFORT" ] && _cmd+=(-c "model_reasoning_effort=\"$EFFORT\"")
-  _cmd+=("$PROMPT")
 
-  REINFORCE_DISABLED=1 "${_cmd[@]}" < "$TRANSCRIPT_PATH" > "$OUT_FILE" 2>> "$LOG_FILE" &
+  _spawn_reflector || return 127
   _pid=$!
-  _log "codex pid=$_pid watchdog=${WATCHDOG_SEC}s model=${MODEL:-<default>} effort=${EFFORT:-<default>}"
+  _log "reflect pid=$_pid watchdog=${WATCHDOG_SEC}s model=${MODEL:-<default>} command=${CUSTOM_COMMAND:+custom}${CUSTOM_COMMAND:-opencode run}"
 
   (
     _sleep_pid=""
@@ -136,7 +147,7 @@ if _run_with_timeout; then
   _compact=$(printf '%s' "$OUTPUT" | tr -d '[:space:]')
   case "$_compact" in
     ""|SKIP)
-      _log "SKIPPED: codex returned no reflection"
+      _log "SKIPPED: reflection command returned no reflection"
       printf 'skipped' > "$DEDUP_FILE" 2>/dev/null
       exit 0
       ;;
@@ -151,9 +162,9 @@ if _run_with_timeout; then
   printf 'done' > "$DEDUP_FILE" 2>/dev/null
 else
   _exit=$?
-  _log "FAILED: codex exited with code $_exit"
+  _log "FAILED: reflection command exited with code $_exit"
   printf 'failed' > "$DEDUP_FILE" 2>/dev/null
 fi
 
-_log "session-reflect-codex finished"
+_log "session-reflect-opencode finished"
 exit 0

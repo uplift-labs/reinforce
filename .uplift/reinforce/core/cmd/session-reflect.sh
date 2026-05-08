@@ -37,8 +37,9 @@ fi
 [ "${CI:-}" = "true" ] && exit 0
 [ -n "${GITHUB_ACTIONS:-}" ] && exit 0
 
-# --- Paths ---
-REFLECTIONS_DIR=".reinforce/reflections"
+# --- Paths (absolute — must not depend on CWD, which may be a worktree) ---
+REPO_ROOT="$(git -C "$(dirname "$REINFORCE_ROOT")" rev-parse --show-toplevel 2>/dev/null || dirname "$REINFORCE_ROOT")"
+REFLECTIONS_DIR="$REINFORCE_ROOT/reflections"
 STATE_DIR="/tmp/reinforce-sessions"
 mkdir -p "$STATE_DIR" 2>/dev/null || exit 0
 
@@ -56,23 +57,23 @@ rmdir "$STATE_DIR/${SESSION_ID}.lock" 2>/dev/null
 command -v claude >/dev/null 2>&1 || { rm -f "$DEDUP_FILE" 2>/dev/null; exit 0; }
 
 # --- Build prompt ---
-DATESTAMP=$(date '+%Y-%m-%d-%H%M' 2>/dev/null || echo "undated")
+DATESTAMP=$(date '+%Y-%m-%d-%H%M%S' 2>/dev/null || echo "undated")
+SAFE_SESSION_ID=$(printf '%s' "$SESSION_ID" | tr '/\\:' '___')
+TARGET_FILE="$REFLECTIONS_DIR/${DATESTAMP}-claude-${SAFE_SESSION_ID}-$$.md"
 TEMPLATE_FILE="$REINFORCE_ROOT/core/templates/reflection-prompt.md"
 
 if [ -f "$TEMPLATE_FILE" ]; then
   PROMPT=$(cat "$TEMPLATE_FILE" 2>/dev/null)
 else
   # Inline fallback — minimal prompt
-  PROMPT="Analyze the session above. If it contained substantive work, write a reflection to ${REFLECTIONS_DIR}/${DATESTAMP}.md with sections: Goal, Outcome, What worked, Mistakes, What was left undone, Key decision, Quality check, Lesson learned, Action items. If trivial, output nothing."
+  PROMPT="Analyze the session above. If it contained substantive work, write a reflection to ${TARGET_FILE} with sections: Goal, Outcome, What worked, Mistakes, What was left undone, Key decision, Quality check, Lesson learned, Action items. If trivial, output nothing."
 fi
 
 # Substitute placeholders
 PROMPT=$(printf '%s' "$PROMPT" \
   | sed "s|{{REFLECTIONS_DIR}}|$REFLECTIONS_DIR|g" \
-  | sed "s|{{DATESTAMP}}|$DATESTAMP|g")
-
-# --- Ensure reflections dir exists ---
-mkdir -p "$REFLECTIONS_DIR" 2>/dev/null || true
+  | sed "s|{{DATESTAMP}}|$DATESTAMP|g" \
+  | sed "s|{{REFLECTION_FILE}}|$TARGET_FILE|g")
 
 # --- Log file for diagnostics ---
 LOG_DIR="$STATE_DIR"
@@ -81,9 +82,27 @@ LOG_FILE="$LOG_DIR/session-reflect-${SESSION_ID}.log"
 _log() { printf '[%s] %s\n' "$(date '+%H:%M:%S' 2>/dev/null)" "$*" >> "$LOG_FILE" 2>/dev/null; }
 
 _log "session-reflect started for $SESSION_ID"
-_log "cwd: $(pwd)"
-_log "REFLECTIONS_DIR: $REFLECTIONS_DIR"
+_log "cwd(initial): $(pwd 2>/dev/null || echo '<unresolvable>')"
 _log "REINFORCE_ROOT: $REINFORCE_ROOT"
+
+# --- Cwd: always use main repo root ---
+# Heartbeat inherits cwd from its launcher (often a sandbox worktree).
+# Even if the worktree CWD is valid, `claude --resume` should run from
+# the main repo root so conversation lookup works correctly.
+# REPO_ROOT is already set above from REINFORCE_ROOT.
+if [ -d "$REPO_ROOT" ] && cd "$REPO_ROOT" 2>/dev/null; then
+  _log "cwd-set: $REPO_ROOT"
+else
+  _log "cwd-recovery-failed: $REPO_ROOT missing or cd failed — aborting"
+  printf 'failed' > "$DEDUP_FILE" 2>/dev/null
+  exit 0
+fi
+_log "cwd(effective): $(pwd)"
+_log "REFLECTIONS_DIR: $REFLECTIONS_DIR"
+_log "TARGET_FILE: $TARGET_FILE"
+
+# --- Ensure reflections dir exists (after cwd recovery so it lands in the right place) ---
+mkdir -p "$REFLECTIONS_DIR" 2>/dev/null || true
 
 # --- Run reflection via claude -p with timeout ---
 MODEL="$REINFORCE_REFLECT_MODEL"
@@ -91,18 +110,35 @@ MODEL="$REINFORCE_REFLECT_MODEL"
 # Snapshot reflections dir before
 _before=$(ls "$REFLECTIONS_DIR" 2>/dev/null | wc -l)
 
-# Timeout wrapper: 120 seconds max, returns claude exit code
+# Timeout wrapper: configurable via REINFORCE_CLAUDE_WATCHDOG_SEC (default 240s).
+# Raised from 120s → 240s because larger models on long sessions with the full
+# retro prompt were consistently hitting SIGTERM (exit 143) at 120s.
+WATCHDOG_SEC="${REINFORCE_CLAUDE_WATCHDOG_SEC:-240}"
 _run_with_timeout() {
   local _pid _exit_code
+  # Env vars prevent the nested `claude` subprocess from re-entering all
+  # hooks installed in the parent session (singularity guards, task-proof,
+  # reinforce itself) and causing a fan-out process explosion on session
+  # end. SINGULARITY_NESTED is read by singularity's guard-multiplexer;
+  # TASK_PROOF_DISABLED and REINFORCE_DISABLED disable those pipelines.
+  SINGULARITY_NESTED=1 TASK_PROOF_DISABLED=1 REINFORCE_DISABLED=1 \
   claude --resume "$SESSION_ID" -p "$PROMPT" \
     --dangerously-skip-permissions \
     --model "$MODEL" \
     >> "$LOG_FILE" 2>&1 &
   _pid=$!
-  _log "claude pid=$_pid model=$MODEL"
+  _log "claude pid=$_pid model=$MODEL watchdog=${WATCHDOG_SEC}s"
 
-  # Background watchdog
-  ( sleep 120 && kill "$_pid" 2>/dev/null ) &
+  # Background watchdog. Trap kills the child sleep too, so short reflections do
+  # not keep the caller alive until the full timeout on Git Bash/MSYS.
+  (
+    _sleep_pid=""
+    trap 'kill "$_sleep_pid" 2>/dev/null; exit 0' TERM INT
+    sleep "$WATCHDOG_SEC" &
+    _sleep_pid=$!
+    wait "$_sleep_pid" 2>/dev/null || exit 0
+    kill "$_pid" 2>/dev/null
+  ) >/dev/null 2>&1 &
   local _watchdog=$!
 
   wait "$_pid" 2>/dev/null
@@ -119,7 +155,9 @@ if _run_with_timeout; then
     _log "SUCCESS: reflection file created ($_before -> $_after files)"
     printf 'done' > "$DEDUP_FILE" 2>/dev/null
   else
-    _log "SKIPPED: claude exited 0 but no new file (session likely trivial)"
+    _log "SKIPPED: claude exited 0 but no new file (session likely trivial or wrong path)"
+    _log "  reflections dir listing: $(ls -1 "$REFLECTIONS_DIR" 2>/dev/null | tr '\n' ' ')"
+    _log "  resolved reflections abs: $(cd "$REFLECTIONS_DIR" 2>/dev/null && pwd -P || echo '<missing>')"
     printf 'skipped' > "$DEDUP_FILE" 2>/dev/null
   fi
 else

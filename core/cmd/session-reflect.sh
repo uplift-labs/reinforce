@@ -57,20 +57,23 @@ rmdir "$STATE_DIR/${SESSION_ID}.lock" 2>/dev/null
 command -v claude >/dev/null 2>&1 || { rm -f "$DEDUP_FILE" 2>/dev/null; exit 0; }
 
 # --- Build prompt ---
-DATESTAMP=$(date '+%Y-%m-%d-%H%M' 2>/dev/null || echo "undated")
+DATESTAMP=$(date '+%Y-%m-%d-%H%M%S' 2>/dev/null || echo "undated")
+SAFE_SESSION_ID=$(printf '%s' "$SESSION_ID" | tr '/\\:' '___')
+TARGET_FILE="$REFLECTIONS_DIR/${DATESTAMP}-claude-${SAFE_SESSION_ID}-$$.md"
 TEMPLATE_FILE="$REINFORCE_ROOT/core/templates/reflection-prompt.md"
 
 if [ -f "$TEMPLATE_FILE" ]; then
   PROMPT=$(cat "$TEMPLATE_FILE" 2>/dev/null)
 else
   # Inline fallback — minimal prompt
-  PROMPT="Analyze the session above. If it contained substantive work, write a reflection to ${REFLECTIONS_DIR}/${DATESTAMP}.md with sections: Goal, Outcome, What worked, Mistakes, What was left undone, Key decision, Quality check, Lesson learned, Action items. If trivial, output nothing."
+  PROMPT="Analyze the session above. If it contained substantive work, write a reflection to ${TARGET_FILE} with sections: Goal, Outcome, What worked, Mistakes, What was left undone, Key decision, Quality check, Lesson learned, Action items. If trivial, output nothing."
 fi
 
 # Substitute placeholders
 PROMPT=$(printf '%s' "$PROMPT" \
   | sed "s|{{REFLECTIONS_DIR}}|$REFLECTIONS_DIR|g" \
-  | sed "s|{{DATESTAMP}}|$DATESTAMP|g")
+  | sed "s|{{DATESTAMP}}|$DATESTAMP|g" \
+  | sed "s|{{REFLECTION_FILE}}|$TARGET_FILE|g")
 
 # --- Log file for diagnostics ---
 LOG_DIR="$STATE_DIR"
@@ -96,6 +99,7 @@ else
 fi
 _log "cwd(effective): $(pwd)"
 _log "REFLECTIONS_DIR: $REFLECTIONS_DIR"
+_log "TARGET_FILE: $TARGET_FILE"
 
 # --- Ensure reflections dir exists (after cwd recovery so it lands in the right place) ---
 mkdir -p "$REFLECTIONS_DIR" 2>/dev/null || true
@@ -125,8 +129,16 @@ _run_with_timeout() {
   _pid=$!
   _log "claude pid=$_pid model=$MODEL watchdog=${WATCHDOG_SEC}s"
 
-  # Background watchdog
-  ( sleep "$WATCHDOG_SEC" && kill "$_pid" 2>/dev/null ) &
+  # Background watchdog. Trap kills the child sleep too, so short reflections do
+  # not keep the caller alive until the full timeout on Git Bash/MSYS.
+  (
+    _sleep_pid=""
+    trap 'kill "$_sleep_pid" 2>/dev/null; exit 0' TERM INT
+    sleep "$WATCHDOG_SEC" &
+    _sleep_pid=$!
+    wait "$_sleep_pid" 2>/dev/null || exit 0
+    kill "$_pid" 2>/dev/null
+  ) >/dev/null 2>&1 &
   local _watchdog=$!
 
   wait "$_pid" 2>/dev/null

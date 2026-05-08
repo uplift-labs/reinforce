@@ -10,6 +10,7 @@ The system is tool-agnostic at its core, with host-specific adapters:
 
 - `adapters/claude-code/` for Claude Code hooks and skills
 - `adapters/codex/` for Codex lifecycle hooks and skills
+- `adapters/opencode/` for a native OpenCode project plugin and skill
 
 ## Architecture
 
@@ -25,17 +26,21 @@ Claude Code uses `.claude/settings.json` hooks and installs the retro skill into
 
 Codex uses `.codex/hooks.json` with `features.codex_hooks = true` and installs the retro skill into `.agents/skills/reinforce/`.
 
+OpenCode uses `.opencode/plugins/reinforce.ts` and installs the retro skill into `.opencode/skills/reinforce/`. OpenCode does not use `.codex/hooks.json`.
+
 ## Key Directories
 
 - `core/guards/` — tool-agnostic guards such as `reflection-reminder.sh`
 - `core/cmd/reinforce-run.sh` — guard multiplexer
 - `core/cmd/session-reflect.sh` — Claude Code reflection backend using `claude --resume`
 - `core/cmd/session-reflect-codex.sh` — Codex reflection backend using `codex exec` over transcript input
+- `core/cmd/session-reflect-opencode.sh` — OpenCode reflection backend using `opencode run` or configurable external command over captured event transcripts
 - `core/lib/heartbeat.sh` — background monitor that triggers reflection after parent process death
 - `core/lib/load-config.sh` — loads `.uplift/reinforce/config`
 - `core/lib/json-merge.py` — idempotent hook JSON merger
 - `core/lib/toml-set-bool.py` — minimal TOML feature updater
 - `core/templates/` — reflection prompts
+- `adapters/opencode/plugins/reinforce.ts` — OpenCode event transcript capture and reflection scheduler
 - `skills/reinforce/SKILL.md` — retro processing skill
 
 ## Commands
@@ -50,6 +55,12 @@ Install locally into a repo for Codex:
 
 ```bash
 bash install.sh --target /path/to/repo --with-codex
+```
+
+Install locally into a repo for OpenCode:
+
+```bash
+bash install.sh --target /path/to/repo --with-opencode
 ```
 
 Install both adapters:
@@ -67,3 +78,4 @@ After editing files under `core/`, `adapters/`, or `skills/`, rerun the installe
 - Avoid adding runtime dependencies beyond bash and Python 3.
 - Keep installer changes idempotent. Running `install.sh` twice must not duplicate hooks or config entries.
 - When adding host hooks, verify both the raw hook output contract and an installed temp-repo flow.
+- OpenCode integration must use native `.opencode/plugins/*.ts` plugin surfaces; do not route OpenCode through `.codex/hooks.json`.

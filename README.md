@@ -34,6 +34,12 @@ For Codex:
 bash <(curl -sSL https://raw.githubusercontent.com/uplift-labs/reinforce/main/remote-install.sh) --with-codex
 ```
 
+For OpenCode:
+
+```bash
+bash <(curl -sSL https://raw.githubusercontent.com/uplift-labs/reinforce/main/remote-install.sh) --with-opencode
+```
+
 ### From local clone
 
 ```bash
@@ -48,6 +54,12 @@ For Codex:
 bash /path/to/reinforce/install.sh --with-codex
 ```
 
+For OpenCode:
+
+```bash
+bash /path/to/reinforce/install.sh --with-opencode
+```
+
 ### Options
 
 | Flag | Effect |
@@ -55,6 +67,7 @@ bash /path/to/reinforce/install.sh --with-codex
 | `--target <dir>` | Install into a specific repo (default: current directory) |
 | `--with-claude-code` | Install Claude Code hooks, merge settings.json, copy retro skill |
 | `--with-codex` | Install Codex hooks, enable `features.codex_hooks`, copy retro skill |
+| `--with-opencode` | Install OpenCode project plugin and retro skill |
 
 ### What gets installed
 
@@ -67,6 +80,7 @@ your-project/
 │   ├── core/templates/       # Reflection prompt and template
 │   ├── adapter/hooks/        # Claude Code adapter (with --with-claude-code)
 │   ├── adapters/codex/       # Codex adapter (with --with-codex)
+│   ├── adapters/opencode/    # OpenCode adapter (with --with-opencode)
 │   ├── config                # Settings (key=value)
 │   └── reflections/          # Where reflections accumulate
 ├── .claude/
@@ -77,15 +91,20 @@ your-project/
 │   └── hooks.json            # Hooks merged in (with --with-codex)
 ├── .agents/
 │   └── skills/reinforce/SKILL.md  # Retro skill (with --with-codex)
+├── .opencode/
+│   ├── plugins/reinforce.ts       # Native OpenCode plugin (with --with-opencode)
+│   └── skills/reinforce/SKILL.md  # Retro skill (with --with-opencode)
 ```
 
 ## How it works
 
 ### Background reflection
 
-When a Claude Code or Codex session ends, a heartbeat monitor detects it and runs the host reflection backend in the background to generate a structured reflection. Claude Code uses `claude --resume ... -p`; Codex reads the session transcript and uses `codex exec` in read-only mode. The reflection is saved to `.uplift/reinforce/reflections/` with a timestamp filename. Sessions that are too short or trivial are automatically skipped.
+When a Claude Code, Codex, or OpenCode session ends, the host adapter runs a background reflection backend to generate a structured reflection. Claude Code uses `claude --resume ... -p`; Codex reads the session transcript and uses `codex exec` in read-only mode. OpenCode uses a native project plugin to capture event transcripts and, by default, summarizes them with `opencode run --pure`; this can be replaced with a configurable external command. The reflection is saved to `.uplift/reinforce/reflections/` with a timestamp + session filename. Sessions that are too short or trivial are automatically skipped.
 
 Codex project-local hooks require the project `.codex/` layer to be trusted by Codex, and hooks are enabled through `features.codex_hooks = true`.
+
+OpenCode project-local plugins require the project config/plugin layer to be trusted by OpenCode. OpenCode does not use `.codex/hooks.json`; it loads `.opencode/plugins/reinforce.ts` directly.
 
 ### Guards
 
@@ -97,7 +116,7 @@ Guards run inside host hooks and produce `BLOCK:<reason>` / `WARN:<context>` / e
 
 ### Retro skill (`/reinforce` or `$reinforce`)
 
-When enough reflections accumulate, run `/reinforce` in Claude Code or `$reinforce` in Codex. The skill:
+When enough reflections accumulate, run `/reinforce` in Claude Code or `$reinforce` in Codex/OpenCode. The skill:
 
 1. **Loads context** — reads all reflections, agent instruction files (`CLAUDE.md` / `AGENTS.md`), and previous retro outcomes
 2. **Triages** — classifies valid/invalid, assigns recency tiers (recent/older/stale)
@@ -121,6 +140,11 @@ Settings are read from `.uplift/reinforce/config` (key=value), with environment 
 | `REINFORCE_CODEX_REFLECT_MODEL` / `codex_reflect_model` | empty | Optional model override for background `codex exec` reflection call |
 | `REINFORCE_CODEX_REFLECT_REASONING_EFFORT` / `codex_reflect_reasoning_effort` | `medium` | Reasoning effort for background `codex exec` reflection call |
 | `REINFORCE_CODEX_REFLECT_TIMEOUT_SEC` / `codex_reflect_timeout_sec` | `240` | Watchdog timeout for background `codex exec` reflection call |
+| `REINFORCE_OPENCODE_REFLECT_COMMAND` / `opencode_reflect_command` | empty | Optional external OpenCode reflection command; empty uses built-in `opencode run` backend |
+| `REINFORCE_OPENCODE_REFLECT_MODEL` / `opencode_reflect_model` | empty | Optional model override for default OpenCode reflection backend |
+| `REINFORCE_OPENCODE_REFLECT_TIMEOUT_SEC` / `opencode_reflect_timeout_sec` | `240` | Watchdog timeout for OpenCode reflection command |
+| `REINFORCE_OPENCODE_IDLE_REFLECT_SEC` / `opencode_idle_reflect_sec` | `0` | Optional idle debounce before OpenCode reflection; `0` disables idle reflection |
+| `REINFORCE_OPENCODE_TRANSCRIPT_MAX_BYTES` / `opencode_transcript_max_bytes` | `1048576` | Max OpenCode event transcript size per session before truncation |
 | `REINFORCE_DISABLE_REFLECTION_REMINDER` | — | Set to `1` to disable the reminder guard |
 
 Also auto-disabled in CI environments (`CI`, `GITHUB_ACTIONS`, `GITLAB_CI`).
@@ -175,11 +199,11 @@ Each package uses unique hook markers for idempotent installation. No conflicts.
 
 ```
 core/           — Tool-agnostic guards (pure bash, stdin JSON / stdout text)
-adapters/       — Host-specific translators (Claude Code and Codex JSON protocols)
+adapters/       — Host-specific translators (Claude Code, Codex, OpenCode)
 skills/         — Agentic skills (retro processing)
 ```
 
-Guards output a simple text protocol (`BLOCK:<reason>` / `WARN:<context>`). Adapters translate to the host tool's JSON format. This separation means reinforce can support other AI coding tools by adding new adapters.
+Guards output a simple text protocol (`BLOCK:<reason>` / `WARN:<context>`). Adapters translate to the host tool's native format. OpenCode is implemented as a native plugin rather than a `.codex/hooks.json` command adapter. This separation means reinforce can support other AI coding tools by adding new adapters.
 
 ## License
 

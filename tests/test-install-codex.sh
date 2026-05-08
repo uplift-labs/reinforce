@@ -10,6 +10,35 @@ mkdir -p "$REPO/.codex"
 git -C "$REPO" init >/dev/null
 
 printf '[features]\nmulti_agent = true\n' > "$REPO/.codex/config.toml"
+cat > "$REPO/.codex/hooks.json" <<'OLD_HOOKS'
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$(git rev-parse --show-toplevel)/.uplift/reinforce/adapters/codex/hooks/session-start.sh\"",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$(git rev-parse --show-toplevel)/.uplift/reinforce/adapters/codex/hooks/stop.sh\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}
+OLD_HOOKS
 
 bash "$ROOT/install.sh" --target "$REPO" --with-codex >/dev/null
 

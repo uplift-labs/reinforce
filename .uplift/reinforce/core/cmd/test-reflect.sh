@@ -10,7 +10,7 @@
 #   bash core/cmd/test-reflect.sh [--session-id <id>]
 #
 # If --session-id is omitted, uses the most recent session from state dir.
-# Writes result to .reinforce/reflections/test-<timestamp>.md
+# Writes result to <install-root>/reflections/test-<timestamp>.md
 
 set -u
 
@@ -29,7 +29,7 @@ ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 # Load config
 . "$ROOT/core/lib/load-config.sh"
 
-REFLECTIONS_DIR=".reinforce/reflections"
+REFLECTIONS_DIR="$ROOT/reflections"
 DATESTAMP=$(date '+%Y-%m-%d-%H%M' 2>/dev/null || echo "undated")
 TARGET_FILE="$REFLECTIONS_DIR/test-${DATESTAMP}.md"
 
@@ -73,6 +73,9 @@ echo ""
 
 MODEL="$REINFORCE_REFLECT_MODEL"
 
+# Env vars prevent nested-session recursion if this debug tool is ever
+# run from inside an active Claude Code session (see session-reflect.sh).
+SINGULARITY_NESTED=1 TASK_PROOF_DISABLED=1 REINFORCE_DISABLED=1 \
 claude --resume "$SESSION_ID" -p "$PROMPT" \
   --dangerously-skip-permissions \
   --model "$MODEL" \

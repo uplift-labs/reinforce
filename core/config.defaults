@@ -15,3 +15,16 @@ reflect_model=opus
 codex_reflect_model=
 codex_reflect_reasoning_effort=medium
 codex_reflect_timeout_sec=240
+
+# OpenCode reflection settings. Empty command means use the built-in
+# `opencode run` backend. Custom commands receive transcript on stdin and these
+# env vars: REINFORCE_REFLECT_PROMPT, REINFORCE_TRANSCRIPT_PATH,
+# REINFORCE_REPO_ROOT, REINFORCE_OUTPUT_FILE.
+opencode_reflect_command=
+opencode_reflect_model=
+opencode_reflect_timeout_sec=240
+
+# OpenCode transcript capture settings.
+# 0 disables idle-triggered reflection; session delete/server dispose still fire.
+opencode_idle_reflect_sec=0
+opencode_transcript_max_bytes=1048576

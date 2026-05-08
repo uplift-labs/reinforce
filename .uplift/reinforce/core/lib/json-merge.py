@@ -11,7 +11,16 @@ import json
 import sys
 from pathlib import Path
 
-MARKER = ".reinforce/adapter/hooks/"
+MARKERS = [
+    "/reinforce/adapter/hooks/",
+    "/reinforce/adapters/claude-code/hooks/",
+    "/reinforce/adapters/codex/hooks/",
+]
+LEGACY_MARKERS = [
+    ".reinforce/adapter/hooks/",
+    ".reinforce/adapters/claude-code/hooks/",
+    ".reinforce/adapters/codex/hooks/",
+]
 
 
 def hook_key(hook):
@@ -25,12 +34,23 @@ def hook_key(hook):
 
 def is_reinforce_hook(hook):
     """Check if a hook was installed by reinforce."""
-    return MARKER in hook.get("command", "")
+    cmd = hook.get("command", "")
+    if any(m in cmd for m in MARKERS):
+        return True
+    return any(m in cmd for m in LEGACY_MARKERS)
 
 
 def merge_matcher_group(existing_group, new_group):
     """Merge hooks within a matcher group, skipping duplicates."""
     existing_hooks = existing_group.get("hooks", [])
+    new_reinforce_keys = {
+        hook_key(h) for h in new_group.get("hooks", []) if is_reinforce_hook(h)
+    }
+    if new_reinforce_keys:
+        existing_hooks = [
+            h for h in existing_hooks
+            if not is_reinforce_hook(h) or hook_key(h) in new_reinforce_keys
+        ]
     existing_keys = {hook_key(h): i for i, h in enumerate(existing_hooks)}
 
     for hook in new_group.get("hooks", []):

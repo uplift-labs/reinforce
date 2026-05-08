@@ -43,6 +43,14 @@ def is_reinforce_hook(hook):
 def merge_matcher_group(existing_group, new_group):
     """Merge hooks within a matcher group, skipping duplicates."""
     existing_hooks = existing_group.get("hooks", [])
+    new_reinforce_keys = {
+        hook_key(h) for h in new_group.get("hooks", []) if is_reinforce_hook(h)
+    }
+    if new_reinforce_keys:
+        existing_hooks = [
+            h for h in existing_hooks
+            if not is_reinforce_hook(h) or hook_key(h) in new_reinforce_keys
+        ]
     existing_keys = {hook_key(h): i for i, h in enumerate(existing_hooks)}
 
     for hook in new_group.get("hooks", []):

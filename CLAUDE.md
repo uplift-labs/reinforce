@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Reinforce is an automatic reinforcement loop for AI coding sessions. It captures session learnings (reflections), accumulates them, and uses LLM analysis to extract patterns and propose improvements. The system is tool-agnostic at its core, with host-specific adapters for Claude Code and Codex.
+Reinforce is an automatic reinforcement loop for AI coding sessions. It captures session learnings (reflections), accumulates them, and uses LLM analysis to extract patterns and propose improvements. The system is tool-agnostic at its core, with host-specific adapters for Claude Code, Codex, and OpenCode.
 
 ## Architecture
 
@@ -17,7 +17,9 @@ Reinforce is an automatic reinforcement loop for AI coding sessions. It captures
 
 **Adapter-level (Claude Code):** For SessionStart hooks, guards wrap messages as `{"decision":"block","reason":"<message>"}` JSON to stdout (exit 0) — this renders the message directly in Claude Code UI.
 
-**Data flow:** Heartbeat detects session end → host reflection backend generates reflection (background) → Accumulate (reflections dir) → Remind (reflection-reminder) → Distill (`/reinforce` or `$reinforce` skill in plan mode) → Apply (user approves)
+**Adapter-level (OpenCode):** OpenCode uses a native `.opencode/plugins/reinforce.ts` project plugin. Do not route OpenCode through `.codex/hooks.json`; OpenCode plugin hooks receive JS arguments and mutate output objects rather than stdin/stdout command JSON.
+
+**Data flow:** Host adapter detects session end → host reflection backend generates reflection (background) → Accumulate (reflections dir) → Remind (reflection-reminder/plugin reminder) → Distill (`/reinforce` or `$reinforce` skill in plan mode) → Apply (user approves)
 
 ### Key directories
 
@@ -25,13 +27,15 @@ Reinforce is an automatic reinforcement loop for AI coding sessions. It captures
 - `core/cmd/reinforce-run.sh` — Multiplexer that groups guards by hook event, reads stdin once, runs guards in sequence with priority (BLOCK > WARN > pass)
 - `core/cmd/session-reflect.sh` — Background reflection orchestrator: calls `claude --resume <session-id> -p` to generate a reflection after session ends
 - `core/cmd/session-reflect-codex.sh` — Codex reflection orchestrator: reads Codex `transcript_path`, calls `codex exec` read-only, and writes reflection markdown itself
+- `core/cmd/session-reflect-opencode.sh` — OpenCode reflection orchestrator: reads OpenCode event transcripts and uses `opencode run` by default, or `opencode_reflect_command` when configured
 - `core/lib/heartbeat.sh` — Background PID monitor: detects host process death, triggers the appropriate reflection backend
 - `core/lib/` — `load-config.sh` (loads installed config), `json-field.sh` (bash JSON extraction), `json-merge.py` (idempotent Python JSON merger), `toml-set-bool.py` (minimal TOML feature updater)
 - `core/config.defaults` — Default config template, copied to `.uplift/reinforce/config` on install
 - `core/templates/` — `reflection.md` (template for reflections), `reflection-prompt.md` (prompt for background `claude -p` call)
 - `adapters/claude-code/hooks/` — Two adapter scripts: `session-start.sh` (spawns heartbeat, checks previous session), `stop.sh` (touches heartbeat marker)
 - `adapters/codex/hooks/` — Codex SessionStart/Stop adapters plus `hooks.json`
-- `skills/reinforce/SKILL.md` — Agentic skill spec for batch-processing reflections; installed into `.claude/skills` for Claude Code and `.agents/skills` for Codex
+- `adapters/opencode/plugins/reinforce.ts` — Native OpenCode plugin: captures event transcripts, schedules reflection, injects reminder context
+- `skills/reinforce/SKILL.md` — Agentic skill spec for batch-processing reflections; installed into `.claude/skills` for Claude Code, `.agents/skills` for Codex, and `.opencode/skills` for OpenCode
 
 ### Design principles
 
@@ -53,10 +57,16 @@ bash install.sh --target /path/to/repo --with-claude-code
 bash install.sh --target /path/to/repo --with-codex
 ```
 
+### Install locally into a repo for OpenCode
+
+```bash
+bash install.sh --target /path/to/repo --with-opencode
+```
+
 ### Install from remote
 
 ```bash
-bash <(curl -sSL https://raw.githubusercontent.com/uplift-labs/reinforce/main/remote-install.sh) --with-claude-code --with-codex
+bash <(curl -sSL https://raw.githubusercontent.com/uplift-labs/reinforce/main/remote-install.sh) --with-claude-code --with-codex --with-opencode
 ```
 
 ### Uninstall hooks from settings.json
@@ -89,6 +99,11 @@ Settings are read from `.uplift/reinforce/config` (key=value format). Environmen
 | `codex_reflect_model` / `REINFORCE_CODEX_REFLECT_MODEL` | empty | Optional model override for `codex exec` reflection |
 | `codex_reflect_reasoning_effort` / `REINFORCE_CODEX_REFLECT_REASONING_EFFORT` | `medium` | Reasoning effort for `codex exec` reflection |
 | `codex_reflect_timeout_sec` / `REINFORCE_CODEX_REFLECT_TIMEOUT_SEC` | `240` | Watchdog timeout for Codex reflection |
+| `opencode_reflect_command` / `REINFORCE_OPENCODE_REFLECT_COMMAND` | empty | Optional external OpenCode reflection command; empty uses `opencode run` |
+| `opencode_reflect_model` / `REINFORCE_OPENCODE_REFLECT_MODEL` | empty | Optional model override for default OpenCode reflection |
+| `opencode_reflect_timeout_sec` / `REINFORCE_OPENCODE_REFLECT_TIMEOUT_SEC` | `240` | Watchdog timeout for OpenCode reflection |
+| `opencode_idle_reflect_sec` / `REINFORCE_OPENCODE_IDLE_REFLECT_SEC` | `0` | Optional idle debounce before OpenCode reflection; `0` disables idle reflection |
+| `opencode_transcript_max_bytes` / `REINFORCE_OPENCODE_TRANSCRIPT_MAX_BYTES` | `1048576` | Max OpenCode event transcript size per session before truncation |
 
 Per-guard disable via env: `REINFORCE_DISABLE_<GUARD_NAME>=1` (e.g. `REINFORCE_DISABLE_REFLECTION_REMINDER=1`).
 
@@ -97,7 +112,7 @@ Per-guard disable via env: `REINFORCE_DISABLE_<GUARD_NAME>=1` (e.g. `REINFORCE_D
 After editing files under `core/`, `adapters/`, or `skills/`, re-run the installer to update the installed copy before testing:
 
 ```bash
-bash install.sh --target . --with-claude-code --with-codex
+bash install.sh --target . --with-claude-code --with-codex --with-opencode
 ```
 
 The `.uplift/reinforce/` directory contains copies of source files — edits to repo sources do NOT auto-propagate to the installed copy.

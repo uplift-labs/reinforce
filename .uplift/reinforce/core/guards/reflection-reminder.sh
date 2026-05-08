@@ -1,7 +1,7 @@
 #!/bin/bash
 # reflection-reminder.sh — Reinforce Guard
 # Hook: SessionStart
-# Reminds to run /reinforce when 3+ reflections have accumulated
+# Reminds to run the reinforce retro when enough reflections have accumulated
 # Fires once per session (startup banner only)
 
 # CI no-op
@@ -19,8 +19,9 @@ SESSION_ID=$(json_field "session_id" "$INPUT")
 MARKER="/tmp/reinforce-reminder-${SESSION_ID}"
 [ -f "$MARKER" ] && exit 0
 
-# Reflections dir and threshold (from config / env / defaults via load-config.sh)
-REFLECTIONS_DIR=".reinforce/reflections"
+# Reflections dir (absolute — must not depend on CWD, which may be a worktree)
+_REINFORCE_ROOT="$(cd "$(dirname "$0")/../.." 2>/dev/null && pwd)"
+REFLECTIONS_DIR="$_REINFORCE_ROOT/reflections"
 THRESHOLD="$REINFORCE_REMINDER_THRESHOLD"
 
 [ ! -d "$REFLECTIONS_DIR" ] && exit 0
@@ -36,7 +37,7 @@ done
 # Mark as reminded
 touch "$MARKER"
 
-REASON="[reinforce] ${PENDING_COUNT} reflections accumulated in ${REFLECTIONS_DIR}/. Recommend running /reinforce to process them."
+REASON="[reinforce] ${PENDING_COUNT} reflections accumulated in ${REFLECTIONS_DIR}/. Recommend running /reinforce in Claude Code or \$reinforce in Codex to process them."
 
 # Plain text for startup banner (shown directly via decision:block JSON in adapter)
 printf '%s\n' "$REASON"

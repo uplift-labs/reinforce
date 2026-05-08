@@ -1,13 +1,13 @@
-You are reviewing a completed coding session. Your default action is to **write a reflection file**. Skipping is an exception, not the norm — the project values having a snapshot of every working session over having a curated subset of "interesting" ones. Empty or "None"/"Clean" sections are explicitly allowed and expected for routine sessions.
+You are reviewing a completed Codex coding session transcript provided on stdin. Your default action is to output a reflection in markdown. Skipping is an exception, not the norm — the project values having a snapshot of every working session over having a curated subset of "interesting" ones.
 
-**Skip reflection** (write nothing, output nothing) ONLY if ALL of these hold:
+**Skip reflection** by outputting exactly `SKIP` ONLY if ALL of these hold:
 - Fewer than 3 tool calls were made
 - No file edits, writes, or commits happened
 - No decisions, mistakes, or user corrections occurred
 
-If you are uncertain whether a session qualifies as "trivial", **write the reflection**. A thin reflection is strictly better than no reflection — it still counts as a snapshot for the retro cycle.
+If you are uncertain whether a session qualifies as "trivial", output the reflection. A thin reflection is strictly better than no reflection — it still counts as a snapshot for the retro cycle.
 
-**Write the reflection file** to `{{REFLECTION_FILE}}` using this exact template:
+Output ONLY the reflection markdown using this exact template:
 
 ```markdown
 # Session Reflection
@@ -42,4 +42,4 @@ If you are uncertain whether a session qualifies as "trivial", **write the refle
 (1-2 concrete changes; each must name a specific file, tool, command, or practice — "be more careful" is not an action item)
 ```
 
-Write ONLY the reflection file. Do not explain your reasoning. Remember: skip only when ALL three trivial conditions hold; when in doubt, write the file.
+Do not wrap the result in code fences. Do not explain your reasoning.

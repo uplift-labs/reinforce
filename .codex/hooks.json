@@ -1,0 +1,28 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"C:/Program Files/Git/bin/bash.exe\" \"$(git rev-parse --show-toplevel)/.uplift/reinforce/adapters/codex/hooks/session-start.sh\"",
+            "timeout": 15,
+            "statusMessage": "[reinforce] Checking reflections..."
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"C:/Program Files/Git/bin/bash.exe\" \"$(git rev-parse --show-toplevel)/.uplift/reinforce/adapters/codex/hooks/stop.sh\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}

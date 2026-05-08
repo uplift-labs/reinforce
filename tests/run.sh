@@ -21,5 +21,7 @@ PY
 bash tests/test-install-codex.sh
 bash tests/test-adapter-codex.sh
 bash tests/test-session-reflect-codex.sh
+bash tests/test-install-opencode.sh
+bash tests/test-session-reflect-opencode.sh
 
 printf 'tests: ok\n'

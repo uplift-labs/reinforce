@@ -16,7 +16,7 @@ GROUP="${1:-}"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-# Load config: .reinforce/config → env vars → defaults
+# Load config: installed config → env vars → defaults
 . "$SCRIPT_DIR/../lib/load-config.sh"
 
 # Global kill switches

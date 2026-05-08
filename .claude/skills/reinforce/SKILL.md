@@ -1,17 +1,17 @@
 ---
 name: reinforce
-description: Process accumulated session reflections into actionable improvements via plan mode — analyze patterns, propose changes, user reviews, then execute
+description: Process accumulated session reflections into actionable improvements via plan mode — analyze patterns, propose changes, user reviews, then execute. Works in Claude Code, Codex, and OpenCode.
 ---
 
 # Reflection Retro
 
 Batch-process session reflections into patterns and concrete project improvements. Works in **plan mode**: analyse first, propose a plan, user reviews, then execute approved changes.
 
-**Trigger:** User says `/reinforce`, or `reflection-reminder` guard signals 3+ reflections at session start.
+**Trigger:** User says `/reinforce` in Claude Code, `$reinforce` in Codex/OpenCode, asks to process reinforce reflections, or `reflection-reminder` guard signals accumulated reflections at session start.
 
-**Scope boundary:** This skill processes reflection files and produces improvement plans. Session reflections themselves are written by the `session-reflection.sh` guard (Stop hook).
+**Scope boundary:** This skill processes reflection files and produces improvement plans. Session reflections themselves are written by host adapters and background reflection commands.
 
-**Resource context:** Claude Max, no API budget. Input: markdown files in reflections directory. Output: improvement plan → user-approved changes → commit.
+**Resource context:** Input: markdown files in reflections directory. Output: improvement plan → user-approved changes → commit.
 
 ## Agentic Protocol
 
@@ -25,10 +25,10 @@ Batch-process session reflections into patterns and concrete project improvement
 
 #### Step 0 — Load Context
 
-1. Locate the reflections directory. Check in order: `$REINFORCE_REFLECTIONS_DIR`, `.reinforce/reflections/`, `docs/reflections/`. Use the first that exists.
+1. Locate the reflections directory. Check in order: `$REINFORCE_REFLECTIONS_DIR`, `.uplift/reinforce/reflections/`, `.reinforce/reflections/`, `docs/reflections/`. Use the first that exists.
 2. Read all `.md` files in the reflections directory. Count them.
 3. If < 3 files, inform user that retro works best with 3+ reflections and ask whether to proceed.
-4. Read `CLAUDE.md` (current rules) — needed to avoid duplicate improvements and to count existing rules.
+4. Read current agent instruction files when present: `AGENTS.md` (Codex/OpenCode), `CLAUDE.md` (Claude Code), and nested overrides relevant to the current directory. These are needed to avoid duplicate improvements and to count existing rules.
 5. Check `git log --oneline -10 -- <reflections-dir>` for recent retro commits — avoid repeating past findings.
 6. Load previous retro outcomes: run `git log --format=%B -1 --grep="feat(retro)"` to extract the last retro's applied improvements and their TEST criteria. If found, hold for Step 4 review.
 **Gate:** Do not proceed unless you have read all reflections.
@@ -94,7 +94,7 @@ Write 2–3 sentences per perspective. If a pattern survives both challenges, pr
 
 #### Step 3 — Generate Improvements
 
-**Retire check first:** Before proposing new improvements, check — are there existing CLAUDE.md rules from previous retros that are (a) contradicted by recent reflections showing they hurt, or (b) redundant with other rules? If so, propose RETIRE items. Removing a bad rule is higher ROI than adding a good one.
+**Retire check first:** Before proposing new improvements, check — are there existing `AGENTS.md` / `CLAUDE.md` rules from previous retros that are (a) contradicted by recent reflections showing they hurt, or (b) redundant with other rules? If so, propose RETIRE items. Removing a bad rule is higher ROI than adding a good one.
 
 For each surviving pattern, produce a **Trigger-Action-Rationale-Test** heuristic:
 
@@ -118,11 +118,11 @@ Categorize improvements into:
 
 Limit to **top 3 actionable improvements** (Retire/Start/Stop with Strong or Moderate confidence) + **up to 2 conditional** (lower confidence, explicitly flagged as experimental). Do not pad the list — fewer high-quality improvements beat more mediocre ones. List Continue items separately as validation.
 
-### Phase 2: Plan (enter plan mode)
+### Phase 2: Plan / Review
 
 #### Step 4 — Write Improvement Plan
 
-Enter plan mode and write the plan file with:
+Enter plan mode if the host supports it. In Codex/OpenCode, use the current plan/review workflow and do not apply changes until the user approves the plan. Write the plan with:
 
 **Previous retro review** (if previous retro outcomes loaded in Step 0):
 - Which past improvements showed evidence of helping (visible in success patterns or absence of previously-recurring mistakes)?
@@ -143,10 +143,10 @@ For each improvement:
 - Why (citing pattern, confidence tag, and reflections)
 - How to verify (TEST criteria)
 
-**CLAUDE.md rule count check:** Before proposing additions to CLAUDE.md, count existing rules. If 15+, flag: "CLAUDE.md has N rules. Consider consolidating or retiring before adding more."
+**Agent instruction rule count check:** Before proposing additions to `AGENTS.md` or `CLAUDE.md`, count existing rules in the target file. If 15+, flag: "`<file>` has N rules. Consider consolidating or retiring before adding more."
 
 Improvements can target **anything the analysis warrants**:
-- CLAUDE.md rules
+- `AGENTS.md` / `CLAUDE.md` rules
 - Code, scripts, utilities
 - Configuration files
 - Skills or guard scripts
@@ -159,9 +159,9 @@ Improvements can target **anything the analysis warrants**:
 **Cleanup section:**
 - Which reflection files to delete after execution (all processed files)
 
-#### Step 5 — Exit Plan Mode
+#### Step 5 — Wait For Approval
 
-Call ExitPlanMode so the user can review the proposed improvements. The user will approve, adjust, or reject.
+Present the plan so the user can review it. The user will approve, adjust, or reject. Do not execute improvements before approval.
 
 ### Phase 3: Execute (after user approval)
 
@@ -171,8 +171,10 @@ Apply all user-approved improvements from the plan.
 
 #### Step 7 — Clean Up and Commit
 
-1. Delete all processed reflection files from the reflections directory (git history preserves them).
-2. Commit all changes with structured metadata:
+1. Delete all processed reflection files from the reflections directory using `rm` (git history preserves them).
+2. **Verification gate** — run `ls <reflections-dir>/*.md 2>/dev/null | wc -l` and confirm the count is 0 (or only contains files created after this retro started). If files remain, delete them now — do NOT proceed to commit until the directory is clean. This step has been skipped by agents in the past, resulting in reflections accumulating across retros.
+3. Stage the deletions with `git add <reflections-dir>/`.
+4. Commit all changes (improvements + deletions) with structured metadata:
 
 ```
 feat(retro): process N reflections, apply M improvements
@@ -189,4 +191,4 @@ Previous retro assessed: [kept/retired/not-yet-evaluated or "first retro"]
 
 ## Reinforcement
 
-Full cycle: load → triage (with recency) → extract (5 lenses + causal linking + confidence) → validate (skeptic + minimalist) → generate (retire-first, TART format, anti-superstition) → plan (previous retro review, rule count check) → user review → execute → clean up with structured commit. Every pattern needs evidence from 2+ reflections. Top 3 + up to 2 conditional improvements. Plan mode for user review. Commit before finishing. If the retro process itself needs improving, include SKILL.md changes in the plan like any other improvement.
+Full cycle: load → triage (with recency) → extract (5 lenses + causal linking + confidence) → validate (skeptic + minimalist) → generate (retire-first, TART format, anti-superstition) → plan (previous retro review, rule count check) → user review → execute → **delete reflection files and verify deletion** → commit with structured metadata. Every pattern needs evidence from 2+ reflections. Top 3 + up to 2 conditional improvements. Plan/review step before execution. **Never commit until reflections directory is verified clean** — this step has been silently skipped before. If the retro process itself needs improving, include SKILL.md changes in the plan like any other improvement.
