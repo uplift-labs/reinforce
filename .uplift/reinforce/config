@@ -1,12 +1,22 @@
-# Reinforce configuration
+# Reinforce OpenCode configuration
 # Environment variables override these values.
 # Lines starting with # are comments. Blank lines are ignored.
 
 # Global kill switch (true/false)
 disabled=false
 
-# Number of reflections before reminder fires
+# Number of reflections before the OpenCode reminder is injected
 reminder_threshold=5
 
-# Model for background reflection (opus, sonnet, haiku)
-reflect_model=opus
+# OpenCode reflection settings. Empty command means use the built-in
+# `opencode run` backend. Custom commands receive transcript on stdin and these
+# env vars: REINFORCE_REFLECT_PROMPT, REINFORCE_TRANSCRIPT_PATH,
+# REINFORCE_REPO_ROOT, REINFORCE_OUTPUT_FILE.
+opencode_reflect_command=
+opencode_reflect_model=
+opencode_reflect_timeout_sec=240
+
+# OpenCode transcript capture settings.
+# 0 disables idle-triggered reflection; session delete/server dispose still fire.
+opencode_idle_reflect_sec=0
+opencode_transcript_max_bytes=1048576

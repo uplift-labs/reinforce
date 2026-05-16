@@ -1,81 +1,47 @@
 # AGENTS.md
 
-This file provides guidance to Codex when working with this repository.
+This file provides guidance when working with this repository in OpenCode.
 
 ## Project Overview
 
-Reinforce is an automatic reinforcement loop for AI coding sessions. It captures session learnings as reflections, accumulates them, and uses agent analysis to extract patterns and propose project improvements.
-
-The system is tool-agnostic at its core, with host-specific adapters:
-
-- `adapters/claude-code/` for Claude Code hooks and skills
-- `adapters/codex/` for Codex lifecycle hooks and skills
-- `adapters/opencode/` for a native OpenCode project plugin and skill
+Reinforce is an automatic reinforcement loop for OpenCode coding sessions. It captures OpenCode session events, summarizes them into reflections, accumulates those reflections, and provides a skill for turning repeated lessons into project improvements.
 
 ## Architecture
 
-Core scripts in `core/` communicate through simple stdin/stdout contracts. Host adapters translate each tool's lifecycle JSON into the core protocol.
+- `adapters/opencode/plugins/reinforce.ts` is the source OpenCode project plugin.
+- `.opencode/plugins/reinforce.ts` is the installed plugin used by this repo.
+- `core/cmd/session-reflect-opencode.sh` reads captured OpenCode event transcripts and runs either `opencode run` or a configured external reflection command.
+- `core/lib/load-config.sh` loads `.uplift/reinforce/config` for the reflection backend.
+- `core/templates/reflection-output-prompt-opencode.md` is the reflection prompt used by the backend.
+- `skills/reinforce/SKILL.md` is the source retro-processing skill.
+- `.opencode/skills/reinforce/SKILL.md` is the installed skill used by this repo.
 
-Guard output protocol:
-
-- `BLOCK:<reason>` — halt the action when the host supports blocking
-- `WARN:<context>` — warn but allow
-- empty output — allow silently
-
-Claude Code uses `.claude/settings.json` hooks and installs the retro skill into `.claude/skills/reinforce/`.
-
-Codex uses `.codex/hooks.json` with `features.codex_hooks = true` and installs the retro skill into `.agents/skills/reinforce/`.
-
-OpenCode uses `.opencode/plugins/reinforce.ts` and installs the retro skill into `.opencode/skills/reinforce/`. OpenCode does not use `.codex/hooks.json`.
-
-## Key Directories
-
-- `core/guards/` — tool-agnostic guards such as `reflection-reminder.sh`
-- `core/cmd/reinforce-run.sh` — guard multiplexer
-- `core/cmd/session-reflect.sh` — Claude Code reflection backend using `claude --resume`
-- `core/cmd/session-reflect-codex.sh` — Codex reflection backend using `codex exec` over transcript input
-- `core/cmd/session-reflect-opencode.sh` — OpenCode reflection backend using `opencode run` or configurable external command over captured event transcripts
-- `core/lib/heartbeat.sh` — background monitor that triggers reflection after parent process death
-- `core/lib/load-config.sh` — loads `.uplift/reinforce/config`
-- `core/lib/json-merge.py` — idempotent hook JSON merger
-- `core/lib/toml-set-bool.py` — minimal TOML feature updater
-- `core/templates/` — reflection prompts
-- `adapters/opencode/plugins/reinforce.ts` — OpenCode event transcript capture and reflection scheduler
-- `skills/reinforce/SKILL.md` — retro processing skill
+OpenCode loads `.opencode/plugins/reinforce.ts` directly. Do not add hook/config layers for other AI tools.
 
 ## Commands
 
-Install locally into a repo for Claude Code:
+Install locally into a repo:
 
 ```bash
-bash install.sh --target /path/to/repo --with-claude-code
+bash install.sh --target /path/to/repo
 ```
 
-Install locally into a repo for Codex:
+Run tests:
 
 ```bash
-bash install.sh --target /path/to/repo --with-codex
+bash tests/run.sh
 ```
 
-Install locally into a repo for OpenCode:
+After editing files under `core/`, `adapters/`, or `skills/`, rerun the installer to update the installed copy before testing this repo's active OpenCode integration:
 
 ```bash
-bash install.sh --target /path/to/repo --with-opencode
+bash install.sh --target .
 ```
-
-Install both adapters:
-
-```bash
-bash install.sh --target /path/to/repo --with-claude-code --with-codex
-```
-
-After editing files under `core/`, `adapters/`, or `skills/`, rerun the installer to update the installed copy before testing.
 
 ## Development Rules
 
-- Keep core logic host-agnostic. Put host wire-format translation in `adapters/<host>/`.
-- Preserve fail-open behavior. Hooks and background reflection scripts should exit `0` unless the command usage itself is invalid.
-- Avoid adding runtime dependencies beyond bash and Python 3.
-- Keep installer changes idempotent. Running `install.sh` twice must not duplicate hooks or config entries.
-- When adding host hooks, verify both the raw hook output contract and an installed temp-repo flow.
-- OpenCode integration must use native `.opencode/plugins/*.ts` plugin surfaces; do not route OpenCode through `.codex/hooks.json`.
+- Keep the OpenCode plugin in `adapters/opencode/`; keep reusable shell backend logic in `core/`.
+- Preserve fail-open behavior. Plugin and background reflection failures must not break OpenCode startup or user sessions.
+- Avoid adding runtime dependencies beyond bash, Python-free shell utilities, and OpenCode itself.
+- Keep installer changes idempotent. Running `install.sh` twice must not duplicate or corrupt the plugin, skill, config, or installed core files.
+- Do not route OpenCode through non-OpenCode hook files. Use native `.opencode/plugins/*.ts` plugin surfaces.

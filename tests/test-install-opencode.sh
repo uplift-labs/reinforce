@@ -10,7 +10,7 @@ mkdir -p "$REPO"
 git -C "$REPO" init >/dev/null
 printf '{"permission":{"bash":{"git status*":"allow"}}}\n' > "$REPO/opencode.json"
 
-bash "$ROOT/install.sh" --target "$REPO" --with-opencode >/dev/null
+bash "$ROOT/install.sh" --target "$REPO" >/dev/null
 
 test -f "$REPO/.uplift/reinforce/core/cmd/session-reflect-opencode.sh"
 test -f "$REPO/.uplift/reinforce/adapters/opencode/plugins/reinforce.ts"
@@ -22,10 +22,9 @@ grep -q 'opencode_reflect_command=' "$REPO/.uplift/reinforce/config"
 grep -q 'session-reflect-opencode.sh' "$REPO/.opencode/plugins/reinforce.ts"
 grep -q 'server.instance.disposed' "$REPO/.opencode/plugins/reinforce.ts"
 grep -q 'session.status' "$REPO/.opencode/plugins/reinforce.ts"
-! grep -q '\.codex' "$REPO/.opencode/plugins/reinforce.ts"
 grep -q 'git status' "$REPO/opencode.json"
 
-bash "$ROOT/install.sh" --target "$REPO" --with-opencode >/dev/null
+bash "$ROOT/install.sh" --target "$REPO" >/dev/null
 test -f "$REPO/.opencode/plugins/reinforce.ts"
 
 printf 'test-install-opencode: ok\n'

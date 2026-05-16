@@ -13,7 +13,7 @@ trap cleanup EXIT
 
 mkdir -p "$REPO" "$FAKE_BIN"
 git -C "$REPO" init >/dev/null
-bash "$ROOT/install.sh" --target "$REPO" --with-opencode >/dev/null
+bash "$ROOT/install.sh" --target "$REPO" >/dev/null
 
 cat > "$FAKE_BIN/opencode" <<'FAKE_OPENCODE'
 #!/bin/bash
