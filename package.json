@@ -1,0 +1,20 @@
+{
+  "name": "@uplift-labs/reinforce",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Automatic reinforcement loop for OpenCode coding sessions.",
+  "bin": {
+    "reinforce-install": "dist/cli/install.js",
+    "reinforce-reflect-opencode": "dist/core/session-reflect-opencode.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "npm run build && node --test \"dist/tests/**/*.test.js\"",
+    "install:local": "npm run build && node dist/cli/install.js --target ."
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.9.0"
+  }
+}

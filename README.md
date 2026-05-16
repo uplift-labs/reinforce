@@ -21,20 +21,25 @@ Reinforce closes the loop for OpenCode:
 5. **Distill** - the `$reinforce` skill analyzes patterns and proposes changes in plan mode for user review.
 6. **Clean up** - approved retros delete processed reflections after applying improvements.
 
+## Requirements
+
+- Node.js and npm
+- OpenCode
+
 ## Install
 
-### One-liner
+### From Local Clone
 
-```bash
-bash <(curl -sSL https://raw.githubusercontent.com/uplift-labs/reinforce/main/remote-install.sh)
+```text
+npm install
+npm run build
+node dist/cli/install.js --target /path/to/your-project
 ```
 
-### From local clone
+From inside the target project:
 
-```bash
-git clone https://github.com/uplift-labs/reinforce.git
-cd your-project
-bash /path/to/reinforce/install.sh
+```text
+node /path/to/reinforce/dist/cli/install.js
 ```
 
 ### Options
@@ -52,8 +57,8 @@ OpenCode support is installed by default. There are no host selection flags.
 your-project/
 ├── .uplift/reinforce/
 │   ├── adapters/opencode/plugins/reinforce.ts
-│   ├── core/cmd/session-reflect-opencode.sh
-│   ├── core/lib/load-config.sh
+│   ├── dist/core/config.js
+│   ├── dist/core/session-reflect-opencode.js
 │   ├── core/templates/reflection-output-prompt-opencode.md
 │   ├── config
 │   └── reflections/
@@ -62,15 +67,15 @@ your-project/
     └── skills/reinforce/SKILL.md
 ```
 
-Commit `.uplift/reinforce/` and `.opencode/` so the integration is available in worktrees. OpenCode project-local plugins require the project config/plugin layer to be trusted by OpenCode.
+Commit `.uplift/reinforce/` and `.opencode/` so the integration is available in worktrees. Generated `dist/` files are ignored in this repository; rebuild and rerun the installer after source changes. OpenCode project-local plugins require the project config/plugin layer to be trusted by OpenCode.
 
 ## How It Works
 
 The native OpenCode plugin captures selected event bus records, including session lifecycle, message updates, command execution, diffs, and status transitions. Events are written to `.uplift/reinforce/opencode/transcripts/` with size limits to avoid unbounded growth.
 
-When reflection is triggered, the plugin starts `.uplift/reinforce/core/cmd/session-reflect-opencode.sh` in the background. By default, the backend runs:
+When reflection is triggered, the plugin starts `.uplift/reinforce/dist/core/session-reflect-opencode.js` with Node.js in the background. By default, the backend runs:
 
-```bash
+```text
 opencode run --pure --format default --dir <repo> --file <transcript> <prompt>
 ```
 
@@ -87,6 +92,7 @@ Settings are read from `.uplift/reinforce/config` with environment variables tak
 | `REINFORCE_OPENCODE_REFLECT_COMMAND` / `opencode_reflect_command` | empty | Optional external reflection command; empty uses `opencode run` |
 | `REINFORCE_OPENCODE_REFLECT_MODEL` / `opencode_reflect_model` | empty | Optional model override for the default OpenCode backend |
 | `REINFORCE_OPENCODE_REFLECT_TIMEOUT_SEC` / `opencode_reflect_timeout_sec` | `240` | Watchdog timeout for reflection command |
+| `REINFORCE_NODE_COMMAND` / `node_command` | `node` | Node.js command used by the OpenCode plugin to launch the compiled backend |
 | `REINFORCE_OPENCODE_IDLE_REFLECT_SEC` / `opencode_idle_reflect_sec` | `0` | Optional idle debounce before reflection; `0` disables idle reflection |
 | `REINFORCE_OPENCODE_TRANSCRIPT_MAX_BYTES` / `opencode_transcript_max_bytes` | `1048576` | Max OpenCode event transcript size per session before truncation |
 
@@ -121,23 +127,24 @@ Run `$reinforce` in OpenCode when reflections have accumulated. The skill:
 
 Run the full test suite:
 
-```bash
-bash tests/run.sh
+```text
+npm test
 ```
 
 After editing source files under `core/`, `adapters/`, or `skills/`, reinstall into this repo before testing the active project plugin:
 
-```bash
-bash install.sh --target .
+```text
+npm run install:local
 ```
 
 ## Architecture
 
 ```
 adapters/opencode/  - OpenCode plugin source
-core/               - OpenCode reflection backend, config loader, prompt template
+cli/                - TypeScript installer CLI
+core/               - TypeScript reflection backend, config loader, prompt template
 skills/             - OpenCode retro-processing skill source
-tests/              - OpenCode installer and reflection backend tests
+tests/              - TypeScript installer and reflection backend tests
 ```
 
 ## License

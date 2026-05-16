@@ -16,6 +16,10 @@ opencode_reflect_command=
 opencode_reflect_model=
 opencode_reflect_timeout_sec=240
 
+# Node.js command used by the OpenCode plugin to launch the compiled backend.
+# Empty means use `node` from PATH. Environment override: REINFORCE_NODE_COMMAND.
+node_command=
+
 # OpenCode transcript capture settings.
 # 0 disables idle-triggered reflection; session delete/server dispose still fire.
 opencode_idle_reflect_sec=0

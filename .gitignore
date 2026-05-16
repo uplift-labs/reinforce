@@ -1,1 +1,4 @@
+.uplift/reinforce/dist/
 .uplift/reinforce/opencode/transcripts/
+dist/
+node_modules/

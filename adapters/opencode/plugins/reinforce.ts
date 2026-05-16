@@ -3,6 +3,25 @@ import { existsSync } from "node:fs"
 import { appendFile, mkdir, readdir, readFile, stat } from "node:fs/promises"
 import path from "node:path"
 
+type OpenCodeServerPlugin = (ctx: {
+  client: any
+  directory?: string
+  worktree?: string
+}) => Promise<Record<string, any>>
+
+interface ReinforcePluginConfig {
+  disabled: boolean
+  reminderThreshold: number
+  idleReflectSec: number
+  transcriptMaxBytes: number
+  nodeCommand: string
+}
+
+interface CapturedEvent {
+  type?: string
+  properties?: Record<string, any>
+}
+
 const SERVICE = "uplift.reinforce.opencode"
 const PREFIX_TEMPLATE = "__REINFORCE_PREFIX__"
 const INSTALL_PREFIX = PREFIX_TEMPLATE.startsWith("__") ? ".uplift" : PREFIX_TEMPLATE
@@ -20,22 +39,22 @@ const CAPTURE_TYPES = new Set([
   "command.executed",
 ])
 
-function truthy(value) {
+function truthy(value: unknown): boolean {
   return /^(1|true|yes)$/i.test(String(value ?? ""))
 }
 
-function numberValue(value, fallback) {
+function numberValue(value: unknown, fallback: number): number {
   const parsed = Number.parseInt(String(value ?? ""), 10)
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback
 }
 
-async function readConfig(reinforceRoot) {
-  const config = {
+async function readConfig(reinforceRoot: string): Promise<ReinforcePluginConfig> {
+  const config: ReinforcePluginConfig = {
     disabled: false,
     reminderThreshold: 5,
     idleReflectSec: 0,
     transcriptMaxBytes: DEFAULT_MAX_TRANSCRIPT_BYTES,
-    bash: process.env.REINFORCE_BASH || "",
+    nodeCommand: process.env.REINFORCE_NODE_COMMAND || process.env.REINFORCE_NODE || "node",
   }
 
   try {
@@ -51,6 +70,7 @@ async function readConfig(reinforceRoot) {
       if (key === "reminder_threshold") config.reminderThreshold = numberValue(value, config.reminderThreshold)
       if (key === "opencode_idle_reflect_sec") config.idleReflectSec = numberValue(value, config.idleReflectSec)
       if (key === "opencode_transcript_max_bytes") config.transcriptMaxBytes = numberValue(value, config.transcriptMaxBytes)
+      if (key === "node_command" && value) config.nodeCommand = value
     }
   } catch {
     // Missing config should not break OpenCode startup.
@@ -66,24 +86,27 @@ async function readConfig(reinforceRoot) {
   if (process.env.REINFORCE_OPENCODE_TRANSCRIPT_MAX_BYTES) {
     config.transcriptMaxBytes = numberValue(process.env.REINFORCE_OPENCODE_TRANSCRIPT_MAX_BYTES, config.transcriptMaxBytes)
   }
+  if (process.env.REINFORCE_NODE_COMMAND || process.env.REINFORCE_NODE) {
+    config.nodeCommand = process.env.REINFORCE_NODE_COMMAND || process.env.REINFORCE_NODE || config.nodeCommand
+  }
 
   return config
 }
 
-function limitString(value, max = 8000) {
+function limitString(value: unknown, max = 8000): string {
   const text = String(value ?? "")
   if (text.length <= max) return text
   return `${text.slice(0, max)}\n[reinforce: truncated ${text.length - max} chars]`
 }
 
-function sanitize(value, depth = 0) {
+function sanitize(value: unknown, depth = 0): unknown {
   if (depth > 4) return "[reinforce: max depth]"
   if (value === null || value === undefined) return value
   if (typeof value === "string") return limitString(value)
   if (typeof value === "number" || typeof value === "boolean") return value
   if (Array.isArray(value)) return value.slice(0, 50).map((item) => sanitize(item, depth + 1))
   if (typeof value === "object") {
-    const out = {}
+    const out: Record<string, unknown> = {}
     for (const [key, nested] of Object.entries(value).slice(0, 80)) {
       out[key] = sanitize(nested, depth + 1)
     }
@@ -92,32 +115,17 @@ function sanitize(value, depth = 0) {
   return String(value)
 }
 
-function sessionIDFrom(event) {
+function sessionIDFrom(event: CapturedEvent): string {
   const properties = event?.properties ?? {}
   return properties.sessionID || properties.info?.id || properties.info?.sessionID || properties.session?.id || ""
 }
 
-function safeSessionID(sessionID) {
+function safeSessionID(sessionID: string): string {
   return String(sessionID).replace(/[\\/:]/g, "_")
 }
 
-function shouldCapture(type) {
+function shouldCapture(type: string): boolean {
   return CAPTURE_TYPES.has(type) || type.startsWith("session.next.")
-}
-
-function resolveBash(config) {
-  if (config.bash) return config.bash
-  if (process.platform === "win32") {
-    const candidates = [
-      "C:/Program Files/Git/bin/bash.exe",
-      "C:/Program Files/Git/usr/bin/bash.exe",
-      `${process.env.LOCALAPPDATA || ""}/Programs/Git/bin/bash.exe`,
-    ].filter(Boolean)
-    for (const candidate of candidates) {
-      if (existsSync(candidate)) return candidate
-    }
-  }
-  return "bash"
 }
 
 export default {
@@ -127,15 +135,15 @@ export default {
     const reinforceRoot = path.join(projectRoot, INSTALL_PREFIX, "reinforce")
     const transcriptsDir = path.join(reinforceRoot, "opencode", "transcripts")
     const reflectionsDir = path.join(reinforceRoot, "reflections")
-    const activeSessions = new Set()
-    const reflectedSessions = new Set()
-    const remindedSessions = new Set()
-    const truncatedSessions = new Set()
-    const idleTimers = new Map()
+    const activeSessions = new Set<string>()
+    const reflectedSessions = new Set<string>()
+    const remindedSessions = new Set<string>()
+    const truncatedSessions = new Set<string>()
+    const idleTimers = new Map<string, ReturnType<typeof setTimeout>>()
     let reminderMessage = ""
     let cachedConfig = await readConfig(reinforceRoot)
 
-    async function log(level, message, extra = {}) {
+    async function log(level: "debug" | "info" | "warn" | "error", message: string, extra: Record<string, unknown> = {}) {
       try {
         await client.app.log({ body: { service: SERVICE, level, message, extra } })
       } catch {
@@ -161,11 +169,11 @@ export default {
       }
     }
 
-    function transcriptPath(sessionID) {
+    function transcriptPath(sessionID: string): string {
       return path.join(transcriptsDir, `${safeSessionID(sessionID)}.jsonl`)
     }
 
-    async function appendTranscript(sessionID, event) {
+    async function appendTranscript(sessionID: string, event: CapturedEvent) {
       const config = await readConfig(reinforceRoot)
       cachedConfig = config
       if (config.disabled) return
@@ -194,7 +202,7 @@ export default {
       await appendFile(file, `${JSON.stringify(record)}\n`, "utf8")
     }
 
-    function runReflection(sessionID, reason) {
+    function runReflection(sessionID: string, reason: string) {
       if (!sessionID || reflectedSessions.has(sessionID)) return
       const config = cachedConfig
       if (config.disabled) return
@@ -203,19 +211,25 @@ export default {
       if (!existsSync(file)) return
 
       reflectedSessions.add(sessionID)
-      const script = path.join(reinforceRoot, "core", "cmd", "session-reflect-opencode.sh")
-      const bash = resolveBash(config)
-      const child = spawn(bash, [script, "--session-id", sessionID, "--transcript-path", file, "--reinforce-root", reinforceRoot], {
+      const script = path.join(reinforceRoot, "dist", "core", "session-reflect-opencode.js")
+      if (!existsSync(script)) {
+        void log("warn", "reflection backend missing; run npm run build and reinstall", { sessionID, script })
+        return
+      }
+      const child = spawn(config.nodeCommand, [script, "--session-id", sessionID, "--transcript-path", file, "--reinforce-root", reinforceRoot], {
         cwd: projectRoot,
         detached: true,
         stdio: "ignore",
         env: { ...process.env, REINFORCE_OPENCODE_TRIGGER_REASON: reason },
       })
+      child.on("error", (error) => {
+        void log("warn", "reflection spawn failed", { sessionID, reason, error: String(error) })
+      })
       child.unref()
-      void log("info", "reflection scheduled", { sessionID, reason, bash })
+      void log("info", "reflection scheduled", { sessionID, reason, node: config.nodeCommand })
     }
 
-    async function scheduleIdleReflection(sessionID) {
+    async function scheduleIdleReflection(sessionID: string) {
       const config = await readConfig(reinforceRoot)
       cachedConfig = config
       if (config.disabled || config.idleReflectSec <= 0) return
@@ -228,7 +242,7 @@ export default {
       idleTimers.set(sessionID, timer)
     }
 
-    function clearIdleTimer(sessionID) {
+    function clearIdleTimer(sessionID: string) {
       const timer = idleTimers.get(sessionID)
       if (timer) clearTimeout(timer)
       idleTimers.delete(sessionID)
@@ -239,8 +253,9 @@ export default {
     await log("info", "loaded", { projectRoot, reinforceRoot })
 
     return {
-      event: async ({ event }) => {
-        const type = event?.type || ""
+      event: async ({ event }: { event: CapturedEvent }) => {
+        const typedEvent = event as CapturedEvent
+        const type = typedEvent?.type || ""
         const sessionID = sessionIDFrom(event)
 
         try {
@@ -256,11 +271,11 @@ export default {
           activeSessions.add(sessionID)
 
           if (shouldCapture(type)) {
-            await appendTranscript(sessionID, event)
+            await appendTranscript(sessionID, typedEvent)
           }
 
           if (type === "session.status") {
-            const status = event.properties?.status?.type
+            const status = typedEvent.properties?.status?.type
             if (status === "idle") void scheduleIdleReflection(sessionID)
             if (status === "busy" || status === "retry") clearIdleTimer(sessionID)
           }
@@ -274,7 +289,7 @@ export default {
         }
       },
 
-      "experimental.chat.system.transform": async (input, output) => {
+      "experimental.chat.system.transform": async (input: { sessionID?: string }, output: { system: string[] }) => {
         try {
           const sessionID = input?.sessionID || ""
           if (!reminderMessage) await refreshReminder()
@@ -288,4 +303,4 @@ export default {
       },
     }
   },
-}
+} satisfies { id: string; server: OpenCodeServerPlugin }
